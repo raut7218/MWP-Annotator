@@ -169,7 +169,7 @@ async function loadRow(rowIndex) {
 
   el('parseWarning').style.display = row.parseError ? 'block' : 'none';
   el('questionText').textContent = row.question || '(empty)';
-  el('answerText').textContent = row.answer || '(empty)';
+  el('answerText').textContent = row.answer || (row.parseError ? '(missing — cut off in source data)' : '(empty)');
 
   renderFlags(row.flags);
   el('commentsBox').value = row.comments || '';

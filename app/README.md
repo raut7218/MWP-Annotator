@@ -20,10 +20,16 @@ scrolling), a progress bar, a colored row-navigator to jump around, filters
 - Admins can create/manage user accounts (and which languages they can see),
   watch progress per language, and export the annotated data back to `.xlsx`
   at any time (same columns as the original, plus a `status` column).
-- Rows with no real question/answer content (blank cells, `{}` placeholders,
-  or a response that failed to parse) are automatically skipped — they're
-  never shown to annotators and don't count toward progress totals. They're
-  still included as-is in admin exports so no source data is lost.
+- Rows where nothing was generated at all (blank cells, or an empty `{}`
+  response) are automatically skipped — they're never shown to annotators and
+  don't count toward progress totals. A separate, larger group of rows have a
+  `response` cell that's genuinely cut off in the source workbook (verified
+  against the raw cell bytes — e.g. Odia had 31 of its 53 rows truncated
+  mid-sentence). Those ARE shown to annotators, with whatever partial
+  question/answer text could be salvaged plus a warning banner asking them to
+  flag it (wrong/missing answer, incomplete/poorly phrased) rather than skip
+  it, per the annotation guidelines. Every row is still included as-is in
+  admin exports either way, so no source data is ever lost.
 - A "📚 Reference" button is embedded on every page (annotate + admin). It
   opens the Annotation Guidelines, the Error Category definitions/examples
   (also reachable per-flag via the ⓘ next to each checkbox), and a searchable
