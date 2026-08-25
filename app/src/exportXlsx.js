@@ -1,15 +1,11 @@
 import XLSX from 'xlsx';
-import { db } from './db.js';
+import { all } from './db.js';
 import { FLAGS } from './flags.js';
 
-const listStmt = db.prepare(
-  'SELECT * FROM rows_data WHERE language = ? ORDER BY row_index ASC'
-);
-
-export function buildWorkbookForLanguages(languages) {
+export async function buildWorkbookForLanguages(languages) {
   const wb = XLSX.utils.book_new();
   for (const language of languages) {
-    const rows = listStmt.all(language);
+    const rows = await all('SELECT * FROM rows_data WHERE language = ? ORDER BY row_index ASC', [language]);
     const sheetRows = rows.map((r) => {
       const out = {
         grade: numericOrRaw(r.grade),

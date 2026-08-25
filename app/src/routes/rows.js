@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { all, get, run } from '../db.js';
 import { FLAGS, FLAG_KEYS } from '../flags.js';
 import { canAccessLanguage, userLanguages } from '../auth.js';
 import { guidelines, errorCategories, ncertExamples, ncertGrades, ncertTopics } from '../reference.js';
@@ -37,62 +37,56 @@ rowsRouter.get('/reference/examples', (req, res) => {
 
 const flaggedExpr = FLAG_KEYS.map((k) => `${k} = 1`).join(' OR ');
 
-const languageStatsStmt = db.prepare(`
+const languageStatsSql = `
   SELECT
     language,
-    COUNT(*) AS total,
-    SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) AS done,
-    SUM(CASE WHEN ${flaggedExpr} THEN 1 ELSE 0 END) AS flagged
+    COUNT(*)::int AS total,
+    SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END)::int AS done,
+    SUM(CASE WHEN ${flaggedExpr} THEN 1 ELSE 0 END)::int AS flagged
   FROM rows_data
   WHERE is_complete = 1
   GROUP BY language
   ORDER BY language
-`);
+`;
 
 rowsRouter.get('/flags', (req, res) => {
   res.json({ flags: FLAGS });
 });
 
-rowsRouter.get('/languages', (req, res) => {
+rowsRouter.get('/languages', async (req, res) => {
   const allowed = userLanguages(req.user); // null = all
-  const stats = languageStatsStmt.all().filter((s) => allowed === null || allowed.includes(s.language));
+  const stats = (await all(languageStatsSql)).filter((s) => allowed === null || allowed.includes(s.language));
   res.json({ languages: stats });
 });
 
-const listStmt = db.prepare(`
+const listSql = `
   SELECT id, row_index, status, (${flaggedExpr}) AS flagged
   FROM rows_data WHERE language = ? AND is_complete = 1 ORDER BY row_index ASC
-`);
+`;
 
-rowsRouter.get('/rows/:language/list', (req, res) => {
+rowsRouter.get('/rows/:language/list', async (req, res) => {
   const { language } = req.params;
   if (!canAccessLanguage(req.user, language)) return res.status(403).json({ error: 'No access to this language' });
-  const items = listStmt.all(language).map((r) => ({ ...r, flagged: !!r.flagged }));
+  const items = (await all(listSql, [language])).map((r) => ({ ...r, flagged: !!r.flagged }));
   res.json({ items });
 });
 
-const detailStmt = db.prepare('SELECT * FROM rows_data WHERE language = ? AND row_index = ? AND is_complete = 1');
-const totalStmt = db.prepare('SELECT COUNT(*) AS c FROM rows_data WHERE language = ? AND is_complete = 1');
-
-rowsRouter.get('/rows/:language/:rowIndex', (req, res) => {
+rowsRouter.get('/rows/:language/:rowIndex', async (req, res) => {
   const { language } = req.params;
   const rowIndex = Number(req.params.rowIndex);
   if (!canAccessLanguage(req.user, language)) return res.status(403).json({ error: 'No access to this language' });
-  const row = detailStmt.get(language, rowIndex);
+  const row = await get('SELECT * FROM rows_data WHERE language = ? AND row_index = ? AND is_complete = 1', [language, rowIndex]);
   if (!row) return res.status(404).json({ error: 'Row not found' });
-  const totalRow = totalStmt.get(language);
+  const totalRow = await get('SELECT COUNT(*)::int AS c FROM rows_data WHERE language = ? AND is_complete = 1', [language]);
   res.json({ row: shapeRow(row), total: totalRow.c });
 });
 
-const byIdStmt = db.prepare('SELECT * FROM rows_data WHERE id = ?');
 const updateCols = [...FLAG_KEYS, 'comments', 'status', 'annotated_by', 'updated_at'];
-const updateStmt = db.prepare(
-  `UPDATE rows_data SET ${updateCols.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`
-);
+const updateSql = `UPDATE rows_data SET ${updateCols.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`;
 
-rowsRouter.put('/rows/:id', (req, res) => {
+rowsRouter.put('/rows/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const existing = byIdStmt.get(id);
+  const existing = await get('SELECT * FROM rows_data WHERE id = ?', [id]);
   if (!existing) return res.status(404).json({ error: 'Row not found' });
   if (!canAccessLanguage(req.user, existing.language)) return res.status(403).json({ error: 'No access to this language' });
 
@@ -109,8 +103,8 @@ rowsRouter.put('/rows/:id', (req, res) => {
     new Date().toISOString(),
     id,
   ];
-  updateStmt.run(...values);
-  const updated = byIdStmt.get(id);
+  await run(updateSql, values);
+  const updated = await get('SELECT * FROM rows_data WHERE id = ?', [id]);
   res.json({ row: shapeRow(updated) });
 });
 

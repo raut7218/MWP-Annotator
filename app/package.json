@@ -4,17 +4,23 @@
   "description": "Language-gated web app for annotating math word problems",
   "main": "server.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "scripts": {
     "import": "node src/importXlsx.js",
     "seed": "node src/seedUsers.js",
+    "migrate-to-pg": "node src/migrateSqliteToPg.js",
     "start": "node server.js",
     "dev": "node server.js"
   },
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^9.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
+    "pg": "^8.23.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

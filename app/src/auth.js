@@ -1,18 +1,15 @@
 import bcrypt from 'bcryptjs';
-import { db } from './db.js';
+import { get } from './db.js';
 
-const getByUsername = db.prepare('SELECT * FROM users WHERE username = ? AND active = 1');
-const getById = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1');
-
-export function verifyLogin(username, password) {
-  const user = getByUsername.get(username);
+export async function verifyLogin(username, password) {
+  const user = await get('SELECT * FROM users WHERE username = ? AND active = 1', [username]);
   if (!user) return null;
   if (!bcrypt.compareSync(password, user.password_hash)) return null;
   return sanitize(user);
 }
 
-export function userById(id) {
-  const user = getById.get(id);
+export async function userById(id) {
+  const user = await get('SELECT * FROM users WHERE id = ? AND active = 1', [id]);
   return user ? sanitize(user) : null;
 }
 
@@ -38,9 +35,9 @@ export function canAccessLanguage(user, language) {
   return user.languages.includes(language);
 }
 
-export function requireLogin(req, res, next) {
+export async function requireLogin(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: 'Not logged in' });
-  const user = userById(req.session.userId);
+  const user = await userById(req.session.userId);
   if (!user) {
     req.session.destroy(() => {});
     return res.status(401).json({ error: 'Session invalid' });

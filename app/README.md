@@ -12,8 +12,8 @@ scrolling), a progress bar, a colored row-navigator to jump around, filters
 ## How it works
 
 - The source workbook has 6 sheets (Sinhala, Tamil, Punjabi, Odia, Marathi,
-  Hindi). Each sheet is imported into a local SQLite database
-  (`app/data/app.db`) — one row per problem.
+  Hindi). Each sheet is imported into a Postgres database (connect via the
+  `DATABASE_URL` env var) — one row per problem.
 - Annotators log in and only see the language(s) their account is assigned.
 - Every save is written straight to the database, so nothing is lost between
   sessions and multiple annotators can work at the same time.
@@ -40,11 +40,21 @@ scrolling), a progress bar, a colored row-navigator to jump around, filters
 
 ## First-time setup
 
+Requires a Postgres database. Set `DATABASE_URL` to its connection string
+(e.g. `postgres://user:pass@host:5432/dbname`) before running any command
+below.
+
 ```bash
 cd app
 npm install
-npm run import   # loads combined_qwen.xlsx into app/data/app.db
+export DATABASE_URL="postgres://user:pass@host:5432/dbname"
+npm run import   # loads combined_qwen.xlsx into Postgres
 ```
+
+If you previously ran this app against the old local SQLite file
+(`app/data/app.db`) and want to carry over existing annotator progress,
+run `npm run migrate-to-pg` once (with `DATABASE_URL` set) before or after
+`npm run import` — it's an upsert, safe either order.
 
 Edit `app/users.seed.json` to set real usernames/passwords per language (an
 `admin` account plus one account per language are pre-filled with placeholder
@@ -80,9 +90,11 @@ entered, plus a `status` column showing pending/reviewed).
 
 ## Notes
 
-- Sessions are cookie-based and reset if the server restarts (set the
-  `SESSION_SECRET` env var to a fixed value to keep sessions alive across
-  restarts). Annotators just log in again — no data is lost either way since
-  every save is persisted immediately.
-- The database lives at `app/data/app.db`; back it up periodically if this is
-  more than a throwaway pilot.
+- Sessions are stored in Postgres (via `connect-pg-simple`), so logins
+  survive server restarts as long as `SESSION_SECRET` is set to a fixed
+  value. Every save is persisted immediately to Postgres either way, so no
+  annotation data is ever lost even if a session drops.
+- Set `DATABASE_URL` (and `SESSION_SECRET`) in your hosting platform's
+  environment variables. On Render's free plan, remember the web service
+  itself has no persistent disk and spins down after 15 minutes idle — that's
+  fine here since all state now lives in Postgres, not on local disk.

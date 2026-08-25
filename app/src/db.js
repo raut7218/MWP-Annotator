@@ -1,23 +1,44 @@
-import { DatabaseSync } from 'node:sqlite';
-import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import pg from 'pg';
 import { FLAG_KEYS } from './flags.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-const dbPath = path.join(dataDir, 'app.db');
+const { Pool } = pg;
 
-export const db = new DatabaseSync(dbPath);
-db.exec('PRAGMA journal_mode = WAL;');
-db.exec('PRAGMA foreign_keys = ON;');
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required (Postgres connection string)');
+}
+
+export const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
+});
+
+// Prepared-statement-style call sites elsewhere use `?` placeholders (carried
+// over from the previous SQLite driver); translate to Postgres's $1, $2, ...
+function toPositional(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+export async function all(sql, params = []) {
+  const res = await pool.query(toPositional(sql), params);
+  return res.rows;
+}
+
+export async function get(sql, params = []) {
+  const res = await pool.query(toPositional(sql), params);
+  return res.rows[0];
+}
+
+export async function run(sql, params = []) {
+  return pool.query(toPositional(sql), params);
+}
 
 const flagCols = FLAG_KEYS.map((k) => `${k} INTEGER NOT NULL DEFAULT 0`).join(',\n    ');
 
-db.exec(`
+await pool.query(`
   CREATE TABLE IF NOT EXISTS rows_data (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     language TEXT NOT NULL,
     row_index INTEGER NOT NULL,
     grade TEXT,
@@ -34,11 +55,13 @@ db.exec(`
     updated_at TEXT,
     UNIQUE(language, row_index)
   );
+`);
 
-  CREATE INDEX IF NOT EXISTS idx_rows_lang ON rows_data(language);
+await pool.query('CREATE INDEX IF NOT EXISTS idx_rows_lang ON rows_data(language);');
 
+await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name TEXT,
@@ -49,7 +72,7 @@ db.exec(`
   );
 `);
 
-export function allLanguages() {
-  const rowsStmt = db.prepare('SELECT DISTINCT language FROM rows_data ORDER BY language');
-  return rowsStmt.all().map((r) => r.language);
+export async function allLanguages() {
+  const rows = await all('SELECT DISTINCT language FROM rows_data ORDER BY language');
+  return rows.map((r) => r.language);
 }

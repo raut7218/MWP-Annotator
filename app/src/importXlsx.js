@@ -6,7 +6,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import XLSX from 'xlsx';
-import { db } from './db.js';
+import { get, run } from './db.js';
 import { FLAG_KEYS } from './flags.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -49,18 +49,6 @@ function extractQA(raw) {
   }
 }
 
-const selectExisting = db.prepare(
-  'SELECT id FROM rows_data WHERE language = ? AND row_index = ?'
-);
-const insertStmt = db.prepare(`
-  INSERT INTO rows_data (language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
-const updateSourceStmt = db.prepare(`
-  UPDATE rows_data SET grade = ?, topic = ?, question = ?, answer = ?, raw_response = ?, parse_error = ?, is_complete = ?
-  WHERE language = ? AND row_index = ?
-`);
-
 let totalInserted = 0;
 let totalUpdated = 0;
 
@@ -92,12 +80,20 @@ for (const sheetName of wb.SheetNames) {
     // phrased) rather than have them silently disappear.
     const isComplete = grade.trim() && topic.trim() && question.trim() ? 1 : 0;
 
-    const existing = selectExisting.get(sheetName, rowIndex);
+    const existing = await get('SELECT id FROM rows_data WHERE language = ? AND row_index = ?', [sheetName, rowIndex]);
     if (existing) {
-      updateSourceStmt.run(grade, topic, question, answer, raw, parseError, isComplete, sheetName, rowIndex);
+      await run(
+        `UPDATE rows_data SET grade = ?, topic = ?, question = ?, answer = ?, raw_response = ?, parse_error = ?, is_complete = ?
+         WHERE language = ? AND row_index = ?`,
+        [grade, topic, question, answer, raw, parseError, isComplete, sheetName, rowIndex]
+      );
       totalUpdated += 1;
     } else {
-      insertStmt.run(sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete);
+      await run(
+        `INSERT INTO rows_data (language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete]
+      );
       totalInserted += 1;
     }
     if (isComplete) completeCount += 1;
@@ -107,3 +103,4 @@ for (const sheetName of wb.SheetNames) {
 
 console.log(`Done. Inserted ${totalInserted} new rows, refreshed ${totalUpdated} existing rows.`);
 console.log('Flag columns tracked:', FLAG_KEYS.join(', '));
+process.exit(0);

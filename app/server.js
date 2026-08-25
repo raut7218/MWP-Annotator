@@ -1,9 +1,10 @@
 import express from 'express';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import './src/db.js';
+import { pool } from './src/db.js';
 import { authRouter } from './src/routes/auth.js';
 import { rowsRouter } from './src/routes/rows.js';
 import { adminRouter } from './src/routes/admin.js';
@@ -14,9 +15,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
+const PgSession = connectPgSimple(session);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(
   session({
+    store: new PgSession({ pool, createTableIfMissing: true }),
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
