@@ -1,0 +1,104 @@
+[
+  {
+    "key": "co_reference_issues",
+    "label": "Co-reference issues",
+    "definition": "Inconsistent reference to entities.",
+    "example": "\"White is 19 years old and Black is 7 years younger than White. How old is Kalu?\" — the second sentence introduces the proper noun \"Kalu\" instead of \"Black\"."
+  },
+  {
+    "key": "trivial_problem",
+    "label": "Trivial problem",
+    "definition": "Self-answering, or requires no meaningful reasoning.",
+    "example": "\"There are 50 balls. What is the total number of balls?\" — the answer is already given in the question itself."
+  },
+  {
+    "key": "grammatical_errors",
+    "label": "Grammatical errors",
+    "definition": "Grammar violations in the problem and/or the answer text.",
+    "example": "\"An farmer has 120 kg of apples...\" — \"An farmer\" is incorrect; it should be \"A farmer\"."
+  },
+  {
+    "key": "misspellings",
+    "label": "Misspellings",
+    "definition": "Misspelled words in the problem and/or the answer text.",
+    "example": "\"Jhon has 3 aplles...\" — \"aplles\" should be \"apples\"."
+  },
+  {
+    "key": "incomplete_or_poorly_phrased",
+    "label": "Incomplete / poorly phrased",
+    "definition": "The problem text has incomplete sentence(s) or could have been phrased better.",
+    "example": "\"Kumara has 15 pencils... Next day, he received 10 pencils as a gift from his grandmother.\" — there is no final question such as \"How many pencils does Kumara have now?\""
+  },
+  {
+    "key": "unsolvable_problem",
+    "label": "Unsolvable problem",
+    "definition": "The MWP has complete sentences, but it cannot be solved because some information is missing and there are contradictions.",
+    "example": "\"Tommy has 5 apples. His friend gives him more apples. How many apples does Tommy have now?\" — the problem doesn't say how many apples the friend gives."
+  },
+  {
+    "key": "unrealistic_scenario",
+    "label": "Unrealistic scenario",
+    "definition": "MWP is solvable but yields an unrealistic result.",
+    "example": "\"The distance between Delhi and Mumbai is 100 km.\" — the real distance is much more than 100km."
+  },
+  {
+    "key": "unit_issues",
+    "label": "Unit issues",
+    "definition": "Incorrect, inconsistent, or missing units in the problem text and/or the answer.",
+    "example": "\"A bottle holds 2 liters and weighs 3 meters.\" — meters measure length, not weight."
+  },
+  {
+    "key": "topic_unsuitability",
+    "label": "Topic unsuitability",
+    "definition": "Content in the problem text is inappropriate for students.",
+    "example": "\"A murderer killed 5 persons last January...\" — content about killing people is not suitable for students."
+  },
+  {
+    "key": "not_satisfying_learning_objective",
+    "label": "Not satisfying learning objective",
+    "definition": "MWP is misaligned with the specified grade/learning objective (LO).",
+    "example": "\"Grade: 1, Problem: Sarah spent $12.50 on a book and $8.75 on a notebook...\" — requires decimal addition, which is not taught in grade 1."
+  },
+  {
+    "key": "not_a_word_problem",
+    "label": "Not a word problem",
+    "definition": "Purely numeric, or not in the intended language.",
+    "example": "\"6 + 7 = ?\" — this is purely numeric, not a word problem. Also applies when no MWP was generated at all (shown as {}), or the question is not in the intended language."
+  },
+  {
+    "key": "ambiguity",
+    "label": "Ambiguity",
+    "definition": "Question is solvable but has multiple plausible interpretations.",
+    "example": "A dishwasher priced at $3000 is discounted twice (10%, then 5%) — it's unclear whether the second discount applies to the original price or the already-discounted price."
+  },
+  {
+    "key": "not_in_country_context",
+    "label": "Not in country context",
+    "definition": "Items, names, or places not appropriate for the target country.",
+    "example": "\"Tom had 5 golf tees. He gets two more from Eric...\" — not suitable for the Sri Lankan context: golf is not popular there, and \"Tom\"/\"Eric\" are not common local names."
+  },
+  {
+    "key": "wrong_or_missing_answer",
+    "label": "Wrong or missing answer",
+    "definition": "Answer is incorrect, missing, incomplete, or not in the intended language.",
+    "example": "\"Shivam found 312 red, 489 blue, and 333 green marbles. How many in total?\" Answer given as 1234, but the correct total is 1134."
+  },
+  {
+    "key": "irrelevant_or_additional_info",
+    "label": "Irrelevant / additional info",
+    "definition": "MWP contains unnecessary details that are not needed to solve it.",
+    "example": "\"Maya has 5 apples. Priya gave her 2 more apples. Priya's brother is going to a movie. How many apples does Maya have now?\" — the sentence about the movie is unnecessary."
+  },
+  {
+    "key": "too_difficult",
+    "label": "Too difficult",
+    "definition": "Adheres to the LO but is too difficult for the specified grade (called \"too_complex\" in the source guidelines).",
+    "example": "A grade 4 subtraction problem that requires two borrowing steps, when the curriculum for that grade expects only one."
+  },
+  {
+    "key": "code_mixed",
+    "label": "Code-mixed",
+    "definition": "The question or answer mixes languages/scripts (e.g. English words dropped into a sentence in the target language). Not part of the original error-category document, but tracked as an additional flag for this project.",
+    "example": "A Hindi question that switches to English mid-sentence for a word that has a perfectly good Hindi equivalent."
+  }
+]

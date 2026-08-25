@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MWP Annotator — Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">MWP Annotator — Admin</div>
+    <div class="spacer"></div>
+    <button class="btn ghost" data-open-reference="guidelines">&#128218; Reference</button>
+    <a class="btn ghost" href="annotate.html">Annotate</a>
+    <span class="user-chip" id="userChip"></span>
+    <button class="btn ghost" id="logoutBtn">Log out</button>
+  </div>
+
+  <div class="admin-wrap">
+    <div class="admin-section">
+      <h2>Progress overview</h2>
+      <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Export annotated data</h2>
+      <p style="color:var(--text-dim);font-size:13px">Downloads an .xlsx with the original columns plus current flags, comments and review status.</p>
+      <div class="form-row" id="exportButtons"></div>
+      <div class="form-row"><button class="btn secondary" id="exportAllBtn">Export all languages (one workbook)</button></div>
+    </div>
+
+    <div class="admin-section">
+      <h2>Users</h2>
+      <table class="data-table" id="usersTable">
+        <thead>
+          <tr><th>Username</th><th>Display name</th><th>Languages</th><th>Admin</th><th>Active</th><th></th></tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+
+    <div class="admin-section">
+      <h2>Add user</h2>
+      <div id="addUserError"></div>
+      <div class="form-row">
+        <input type="text" id="newUsername" placeholder="username" />
+        <input type="text" id="newDisplayName" placeholder="display name" />
+        <input type="password" id="newPassword" placeholder="password" />
+      </div>
+      <div class="form-row">
+        <div class="checkbox-list" id="newUserLangs"></div>
+      </div>
+      <div class="form-row">
+        <label><input type="checkbox" id="newUserAdmin" /> Admin (access to all languages)</label>
+      </div>
+      <button class="btn" id="addUserBtn">Create user</button>
+    </div>
+  </div>
+
+  <script src="js/reference.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

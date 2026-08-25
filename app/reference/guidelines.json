@@ -1,0 +1,14 @@
+[
+  { "id": 1, "text": "Question format: Due to the way the LLMs generate their output, some answers may be within quotes and some may not. Similarly, some LLMs give the explanation of the answer as well, while others simply give the answer. Since these can be brought into a uniform format via specific prompt instructions and output parsing, we ignore the answer format variations. In other words, as long as the answer is correct, we do not worry about the format." },
+  { "id": 2, "text": "The MWP and the answer may have the full name of the unit, or its abbreviation. Both are ok." },
+  { "id": 3, "text": "We do not expect the answer to carry the name of the corresponding entity. I.e. the answer '18 books', and '18' are both ok." },
+  { "id": 4, "text": "Both of the following numerical representations are ok: 1000 and 1,000" },
+  { "id": 5, "text": "If there is no MWP generated (indicated by {}), this should be marked as 'not a word problem' error, as well as 'wrong or missing answer'." },
+  { "id": 6, "text": "If the MWP has been generated, but an answer has not been generated, or only part of the answer reasoning is there, mark it as 'wrong or missing answer'." },
+  { "id": 7, "text": "We allow both American and British English." },
+  { "id": 8, "text": "Carefully check the numbers in the MWP to make sure that they adhere to previous learning objectives (LOs) as well. For example, if the grade 3 addition LO says the addition should be between 2 or 3 digit numbers, any MWP related to any other LO that involves addition (e.g. measurement or money questions) should not have numbers more than 3 digits." },
+  { "id": 9, "text": "Sometimes the LLM mentions proper names that do not exist in the country (e.g. it can make up names of temples and food). These should be marked as 'not in country context'." },
+  { "id": 10, "text": "Sometimes, the values used in questions are unrealistic. For example, if a question says the distance between New Delhi and Mumbai is 100km, this is unrealistic, and should be marked as an 'unrealistic scenario'." },
+  { "id": 11, "text": "If the question is not in the intended language, mark as 'not a word problem' error. If the answer is missing and/or not in the intended language, mark as 'wrong or missing answer'." },
+  { "id": 12, "text": "For India: Sometimes the LLM uses the rupee symbol ₹ instead of the word \"rupee.\" Since our data does not contain the word \"rupee,\" treat ₹ and \"rupee\" as equivalent." }
+]

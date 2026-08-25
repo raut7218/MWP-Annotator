@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MWP Annotator</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">MWP Annotator</div>
+    <span class="lang-badge" id="langBadge" style="display:none"></span>
+    <select id="langSelect" style="display:none"></select>
+    <div class="progress-wrap" id="progressWrap" style="display:none">
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText">0 / 0</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost" data-open-reference="guidelines">&#128218; Reference</button>
+    <span class="user-chip" id="userChip"></span>
+    <button class="btn ghost" id="logoutBtn">Log out</button>
+  </div>
+
+  <!-- Language picker (shown when user has access to multiple languages and none chosen yet) -->
+  <div class="main" id="pickerView" style="display:none">
+    <h2>Choose a language to annotate</h2>
+    <div class="lang-picker-grid" id="langPickerGrid"></div>
+  </div>
+
+  <div class="layout" id="layoutView" style="display:none">
+    <div class="sidebar">
+      <div>
+        <h3>Filter</h3>
+        <div class="filter-row" id="filterRow">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="pending">Pending</button>
+          <button class="chip" data-filter="reviewed">Reviewed</button>
+          <button class="chip" data-filter="flagged">Flagged</button>
+        </div>
+      </div>
+      <div>
+        <h3>Jump to #</h3>
+        <div class="jump-row">
+          <input type="number" id="jumpInput" min="1" placeholder="row number" />
+        </div>
+      </div>
+      <div>
+        <h3>Rows (<span id="navCount">0</span>)</h3>
+        <div class="grid-nav" id="gridNav"></div>
+      </div>
+      <div class="legend">
+        <div><span class="dot" style="background:var(--gray-bg)"></span>Pending</div>
+        <div><span class="dot" style="background:var(--green-bg)"></span>Reviewed, no issues</div>
+        <div><span class="dot" style="background:var(--orange-bg)"></span>Reviewed, flagged</div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="card" id="card">
+        <div class="meta-row">
+          <span class="pill grade" id="pillGrade"></span>
+          <span class="pill" id="pillTopic"></span>
+          <span class="status-badge" id="statusBadge"></span>
+          <span class="row-index-pill" id="rowIndexPill"></span>
+        </div>
+
+        <div id="parseWarning" class="parse-warning" style="display:none">
+          This row's response could not be parsed as JSON — showing raw text.
+        </div>
+
+        <div class="qa-block">
+          <div class="qa-label">Question</div>
+          <div class="question-text" id="questionText"></div>
+        </div>
+        <div class="qa-block">
+          <div class="qa-label">Answer</div>
+          <div class="answer-text" id="answerText"></div>
+        </div>
+
+        <div class="flags-section">
+          <div class="qa-label" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Issues (check all that apply)</span>
+            <button type="button" class="btn ghost" style="padding:3px 10px;font-size:11.5px" data-open-reference="categories">View definitions &amp; examples</button>
+          </div>
+          <div class="flags-grid" id="flagsGrid"></div>
+        </div>
+
+        <div class="comments-block">
+          <div class="qa-label">Comments (optional)</div>
+          <textarea id="commentsBox" placeholder="Explain any issue you flagged..."></textarea>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn secondary" id="prevBtn">&larr; Previous</button>
+          <button class="btn secondary" id="clearBtn">No issues</button>
+          <span class="save-status" id="saveStatus"></span>
+          <div class="right">
+            <button class="btn" id="saveBtn">Save</button>
+            <button class="btn success" id="saveNextBtn">Save &amp; Next &rarr;</button>
+          </div>
+        </div>
+        <div class="kb-hint">
+          <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> navigate &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>Enter</kbd> save &amp; next &nbsp;·&nbsp; <kbd>Ctrl</kbd>+<kbd>D</kbd> no issues &amp; next
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main center-msg" id="emptyView" style="display:none"></div>
+
+  <script src="js/reference.js"></script>
+  <script src="js/annotate.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+[
+  {
+    "username": "admin",
+    "password": "change-me-admin",
+    "displayName": "Admin",
+    "languages": ["*"],
+    "isAdmin": true
+  },
+  {
+    "username": "hindi_annotator",
+    "password": "change-me-hindi",
+    "displayName": "Hindi Annotator",
+    "languages": ["Hindi"],
+    "isAdmin": false
+  },
+  {
+    "username": "marathi_annotator",
+    "password": "change-me-marathi",
+    "displayName": "Marathi Annotator",
+    "languages": ["Marathi"],
+    "isAdmin": false
+  }
+]
