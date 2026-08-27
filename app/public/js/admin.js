@@ -1,5 +1,6 @@
 const el = (id) => document.getElementById(id);
 let availableLanguages = [];
+let availableModels = [];
 
 async function api(url, opts) {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -36,12 +37,13 @@ async function loadOverview() {
   grid.innerHTML = '';
   const exportButtons = el('exportButtons');
   exportButtons.innerHTML = '';
-  for (const [lang, stats] of Object.entries(overview)) {
+  for (const stats of overview) {
     const pct = stats.total ? Math.round(((stats.reviewed || 0) / stats.total) * 100) : 0;
+    const label = `${stats.model} · ${stats.language}`;
     const card = document.createElement('div');
     card.className = 'overview-card';
     card.innerHTML = `
-      <div class="lang-name">${escapeHtml(lang)}</div>
+      <div class="lang-name">${escapeHtml(label)}</div>
       <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
       <div style="font-size:12.5px;color:var(--text-dim)">${stats.reviewed || 0} / ${stats.total} reviewed (${pct}%)</div>
     `;
@@ -49,29 +51,35 @@ async function loadOverview() {
 
     const btn = document.createElement('button');
     btn.className = 'btn secondary';
-    btn.textContent = `Export ${lang}`;
+    btn.textContent = `Export ${label}`;
     btn.addEventListener('click', () => {
-      window.location.href = `/api/admin/export/${encodeURIComponent(lang)}`;
+      window.location.href = `/api/admin/export/${encodeURIComponent(stats.model)}/${encodeURIComponent(stats.language)}`;
     });
     exportButtons.appendChild(btn);
   }
 }
 
 async function loadUsers() {
-  const { users, availableLanguages: langs } = await api('/api/admin/users');
+  const { users, availableLanguages: langs, availableModels: models } = await api('/api/admin/users');
   availableLanguages = langs;
+  availableModels = models;
   renderNewUserLangs();
+  renderNewUserModels();
 
   const body = el('usersBody');
   body.innerHTML = '';
   for (const u of users) {
     const tr = document.createElement('tr');
+    const modelTags = u.isAdmin
+      ? '<span class="tag">ALL</span>'
+      : u.models.map((m) => `<span class="tag">${escapeHtml(m)}</span>`).join('');
     const langTags = u.isAdmin
       ? '<span class="tag">ALL</span>'
       : u.languages.map((l) => `<span class="tag">${escapeHtml(l)}</span>`).join('');
     tr.innerHTML = `
       <td>${escapeHtml(u.username)}</td>
       <td>${escapeHtml(u.displayName || '')}</td>
+      <td>${modelTags}</td>
       <td>${langTags}</td>
       <td>${u.isAdmin ? 'Yes' : 'No'}</td>
       <td>${u.active ? 'Active' : 'Disabled'}</td>
@@ -80,9 +88,16 @@ async function loadUsers() {
     const actionsTd = tr.lastElementChild;
 
     if (!u.isAdmin) {
+      const editModelsBtn = document.createElement('button');
+      editModelsBtn.className = 'btn ghost';
+      editModelsBtn.textContent = 'Edit models';
+      editModelsBtn.addEventListener('click', () => editModels(u));
+      actionsTd.appendChild(editModelsBtn);
+
       const editBtn = document.createElement('button');
       editBtn.className = 'btn ghost';
       editBtn.textContent = 'Edit languages';
+      editBtn.style.marginLeft = '6px';
       editBtn.addEventListener('click', () => editLanguages(u));
       actionsTd.appendChild(editBtn);
     }
@@ -122,10 +137,26 @@ async function editLanguages(u) {
   loadUsers();
 }
 
+async function editModels(u) {
+  const current = u.models.join(', ');
+  const input = prompt(`Models for ${u.username} (comma-separated, from: ${availableModels.join(', ')})`, current);
+  if (input === null) return;
+  const models = input.split(',').map((s) => s.trim()).filter(Boolean);
+  await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: JSON.stringify({ models }) });
+  loadUsers();
+}
+
 function renderNewUserLangs() {
   const wrap = el('newUserLangs');
   wrap.innerHTML = availableLanguages
     .map((l) => `<label><input type="checkbox" value="${escapeHtml(l)}" /> ${escapeHtml(l)}</label>`)
+    .join('');
+}
+
+function renderNewUserModels() {
+  const wrap = el('newUserModels');
+  wrap.innerHTML = availableModels
+    .map((m) => `<label><input type="checkbox" value="${escapeHtml(m)}" /> ${escapeHtml(m)}</label>`)
     .join('');
 }
 
@@ -136,6 +167,7 @@ async function addUser() {
   const password = el('newPassword').value;
   const isAdmin = el('newUserAdmin').checked;
   const languages = Array.from(el('newUserLangs').querySelectorAll('input:checked')).map((i) => i.value);
+  const models = Array.from(el('newUserModels').querySelectorAll('input:checked')).map((i) => i.value);
 
   if (!username || !password) {
     el('addUserError').innerHTML = '<div class="error-msg">Username and password are required.</div>';
@@ -144,13 +176,14 @@ async function addUser() {
   try {
     await api('/api/admin/users', {
       method: 'POST',
-      body: JSON.stringify({ username, displayName, password, isAdmin, languages }),
+      body: JSON.stringify({ username, displayName, password, isAdmin, languages, models }),
     });
     el('newUsername').value = '';
     el('newDisplayName').value = '';
     el('newPassword').value = '';
     el('newUserAdmin').checked = false;
     el('newUserLangs').querySelectorAll('input:checked').forEach((i) => (i.checked = false));
+    el('newUserModels').querySelectorAll('input:checked').forEach((i) => (i.checked = false));
     loadUsers();
   } catch (err) {
     el('addUserError').innerHTML = `<div class="error-msg">${escapeHtml(err.message)}</div>`;

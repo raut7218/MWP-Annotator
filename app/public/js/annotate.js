@@ -1,6 +1,7 @@
 const state = {
   user: null,
   flagDefs: [],
+  model: null,
   language: null,
   list: [], // [{id,row_index,status,flagged}]
   filter: 'all',
@@ -9,6 +10,8 @@ const state = {
   dirty: false,
   saving: false,
 };
+
+let errorCategoriesCache = null;
 
 const el = (id) => document.getElementById(id);
 
@@ -35,19 +38,19 @@ async function init() {
   const { flags } = await api('/api/flags');
   state.flagDefs = flags;
 
-  const { languages } = await api('/api/languages');
-  if (languages.length === 0) {
-    showEmpty('No languages are assigned to your account yet. Ask your admin for access.');
+  const { models } = await api('/api/models');
+  if (models.length === 0) {
+    showEmpty('No models are assigned to your account yet. Ask your admin for access.');
     return;
   }
 
-  const saved = localStorage.getItem('mwp_lang_' + user.username);
-  if (languages.length === 1) {
-    await selectLanguage(languages[0].language);
-  } else if (saved && languages.some((l) => l.language === saved)) {
-    await selectLanguage(saved);
+  const savedModel = localStorage.getItem('mwp_model_' + user.username);
+  if (models.length === 1) {
+    await selectModel(models[0].model);
+  } else if (savedModel && models.some((m) => m.model === savedModel)) {
+    await selectModel(savedModel);
   } else {
-    renderLanguagePicker(languages);
+    renderModelPicker(models);
   }
 
   wireStaticEvents();
@@ -56,6 +59,64 @@ async function init() {
 function showEmpty(msg) {
   el('emptyView').style.display = 'block';
   el('emptyView').textContent = msg;
+}
+
+function renderModelPicker(models) {
+  el('modelPickerView').style.display = 'block';
+  el('pickerView').style.display = 'none';
+  el('layoutView').style.display = 'none';
+  const grid = el('modelPickerGrid');
+  grid.innerHTML = '';
+  for (const m of models) {
+    const pct = m.total ? Math.round((m.done / m.total) * 100) : 0;
+    const card = document.createElement('div');
+    card.className = 'lang-card';
+    card.innerHTML = `
+      <h3 style="text-transform:capitalize">${escapeHtml(m.model)}</h3>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-text">${m.done} / ${m.total} reviewed &middot; ${m.flagged} flagged</div>
+      <button class="btn block">Choose model</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => selectModel(m.model));
+    grid.appendChild(card);
+  }
+}
+
+async function selectModel(model) {
+  state.model = model;
+  localStorage.setItem('mwp_model_' + state.user.username, model);
+  el('modelPickerView').style.display = 'none';
+
+  const { models } = await api('/api/models');
+  if (models.length > 1) {
+    el('modelSelect').style.display = 'inline-block';
+    el('modelBadge').style.display = 'none';
+    const sel = el('modelSelect');
+    sel.innerHTML = models.map((m) => `<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)}</option>`).join('');
+    sel.value = model;
+  } else {
+    el('modelBadge').style.display = 'inline-block';
+    el('modelBadge').textContent = model;
+    el('modelSelect').style.display = 'none';
+  }
+
+  const { languages } = await api(`/api/models/${encodeURIComponent(model)}/languages`);
+  if (languages.length === 0) {
+    el('pickerView').style.display = 'none';
+    el('layoutView').style.display = 'none';
+    showEmpty('No languages are assigned to your account for this model yet. Ask your admin for access.');
+    return;
+  }
+  el('emptyView').style.display = 'none';
+
+  const saved = localStorage.getItem('mwp_lang_' + state.user.username + '_' + model);
+  if (languages.length === 1) {
+    await selectLanguage(languages[0].language);
+  } else if (saved && languages.some((l) => l.language === saved)) {
+    await selectLanguage(saved);
+  } else {
+    renderLanguagePicker(languages);
+  }
 }
 
 function renderLanguagePicker(languages) {
@@ -80,17 +141,17 @@ function renderLanguagePicker(languages) {
 
 async function selectLanguage(language) {
   state.language = language;
-  localStorage.setItem('mwp_lang_' + state.user.username, language);
+  localStorage.setItem('mwp_lang_' + state.user.username + '_' + state.model, language);
   el('pickerView').style.display = 'none';
   el('layoutView').style.display = 'grid';
   el('progressWrap').style.display = 'flex';
 
-  const { languages } = await api('/api/languages');
+  const { languages } = await api(`/api/models/${encodeURIComponent(state.model)}/languages`);
   if (languages.length > 1) {
     el('langSelect').style.display = 'inline-block';
     el('langBadge').style.display = 'none';
     const sel = el('langSelect');
-    sel.innerHTML = languages.map((l) => `<option value="${l.language}">${l.language}</option>`).join('');
+    sel.innerHTML = languages.map((l) => `<option value="${escapeHtml(l.language)}">${escapeHtml(l.language)}</option>`).join('');
     sel.value = language;
   } else {
     el('langBadge').style.display = 'inline-block';
@@ -99,7 +160,7 @@ async function selectLanguage(language) {
   }
 
   await refreshList();
-  const savedRow = Number(localStorage.getItem('mwp_row_' + state.user.username + '_' + language));
+  const savedRow = Number(localStorage.getItem('mwp_row_' + state.user.username + '_' + state.model + '_' + language));
   const firstPending = state.list.find((r) => r.status !== 'reviewed');
   const startRow = savedRow && state.list.some((r) => r.row_index === savedRow)
     ? savedRow
@@ -108,7 +169,7 @@ async function selectLanguage(language) {
 }
 
 async function refreshList() {
-  const { items } = await api(`/api/rows/${encodeURIComponent(state.language)}/list`);
+  const { items } = await api(`/api/rows/${encodeURIComponent(state.model)}/${encodeURIComponent(state.language)}/list`);
   state.list = items;
   renderGridNav();
   renderProgress();
@@ -155,11 +216,11 @@ async function goToRow(rowIndex) {
 }
 
 async function loadRow(rowIndex) {
-  const { row, total } = await api(`/api/rows/${encodeURIComponent(state.language)}/${rowIndex}`);
+  const { row, total } = await api(`/api/rows/${encodeURIComponent(state.model)}/${encodeURIComponent(state.language)}/${rowIndex}`);
   state.currentRow = row;
   state.currentRowIndex = rowIndex;
   state.dirty = false;
-  localStorage.setItem('mwp_row_' + state.user.username + '_' + state.language, rowIndex);
+  localStorage.setItem('mwp_row_' + state.user.username + '_' + state.model + '_' + state.language, rowIndex);
 
   el('pillGrade').textContent = row.grade ? `Grade ${row.grade}` : 'Grade —';
   el('pillTopic').textContent = row.topic || '';
@@ -204,12 +265,14 @@ function renderFlags(flagValues) {
     wrap.innerHTML = `
       <input type="checkbox" data-key="${f.key}" ${flagValues[f.key] ? 'checked' : ''} />
       <span>
-        <div class="flabel">${escapeHtml(f.label)} <a href="reference.html?tab=categories&focus=${encodeURIComponent(f.key)}" target="_blank" rel="noopener" class="finfo" title="View definition & example">ⓘ</a></div>
+        <div class="flabel">${escapeHtml(f.label)} <a href="#" class="finfo" title="View definition & example">ⓘ</a></div>
         <div class="fhint">${escapeHtml(f.hint)}</div>
       </span>
     `;
     wrap.querySelector('.finfo').addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
+      showErrorInfo(f.key);
     });
     const input = wrap.querySelector('input');
     input.addEventListener('change', () => {
@@ -217,6 +280,26 @@ function renderFlags(flagValues) {
     });
     grid.appendChild(wrap);
   }
+}
+
+async function getErrorCategories() {
+  if (!errorCategoriesCache) {
+    const data = await api('/api/reference/error-categories');
+    errorCategoriesCache = data.errorCategories;
+  }
+  return errorCategoriesCache;
+}
+
+async function showErrorInfo(key) {
+  const categories = await getErrorCategories();
+  const cat = categories.find((c) => c.key === key);
+  if (!cat) return;
+  el('errorInfoLabel').textContent = cat.label;
+  el('errorInfoDef').textContent = cat.definition;
+  el('errorInfoEx').textContent = cat.example;
+  const box = el('errorInfoBox');
+  box.style.display = 'block';
+  box.scrollIntoView({ block: 'nearest' });
 }
 
 function markDirty() {
@@ -296,9 +379,18 @@ function wireStaticEvents() {
     window.location.href = 'index.html';
   });
 
+  el('modelSelect').addEventListener('change', async (e) => {
+    await maybeAutosave();
+    await selectModel(e.target.value);
+  });
+
   el('langSelect').addEventListener('change', async (e) => {
     await maybeAutosave();
     await selectLanguage(e.target.value);
+  });
+
+  el('errorInfoClose').addEventListener('click', () => {
+    el('errorInfoBox').style.display = 'none';
   });
 
   el('filterRow').addEventListener('click', (e) => {

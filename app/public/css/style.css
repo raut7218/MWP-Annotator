@@ -126,6 +126,15 @@ a { color: var(--primary); }
   z-index: 20;
 }
 .topbar .brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.topbar .model-badge {
+  background: var(--green);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  text-transform: capitalize;
+}
 .topbar .lang-badge {
   background: var(--primary);
   color: white;
@@ -216,6 +225,12 @@ a { color: var(--primary); }
 .ref-links { display: flex; flex-direction: column; gap: 6px; }
 .ref-links a { font-size: 13px; text-decoration: none; color: var(--text-dim); }
 .ref-links a:hover { color: var(--primary); text-decoration: underline; }
+.error-info-box { border: 1px solid var(--primary); border-radius: 8px; padding: 10px 12px; background: #eef1fd; }
+.error-info-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.error-info-header h4 { margin: 0; font-size: 13px; color: var(--primary-dark); }
+.error-info-close { border: none; background: transparent; font-size: 16px; line-height: 1; cursor: pointer; color: var(--text-dim); padding: 0 4px; }
+.error-info-def { font-size: 13px; margin-bottom: 6px; }
+.error-info-ex { font-size: 12px; color: var(--text-dim); background: var(--gray-bg); border-radius: 6px; padding: 7px 9px; }
 
 /* ---------- Main annotate panel ---------- */
 .main {

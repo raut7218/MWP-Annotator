@@ -21,19 +21,20 @@ const users = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
 for (const u of users) {
   const hash = bcrypt.hashSync(u.password, 10);
   const languages = JSON.stringify(u.languages || []);
+  const models = JSON.stringify(u.models || []);
   const isAdmin = u.isAdmin ? 1 : 0;
   const existing = await get('SELECT id FROM users WHERE username = ?', [u.username]);
   if (existing) {
     await run(
-      'UPDATE users SET password_hash = ?, display_name = ?, languages = ?, is_admin = ?, active = 1 WHERE username = ?',
-      [hash, u.displayName || u.username, languages, isAdmin, u.username]
+      'UPDATE users SET password_hash = ?, display_name = ?, languages = ?, models = ?, is_admin = ?, active = 1 WHERE username = ?',
+      [hash, u.displayName || u.username, languages, models, isAdmin, u.username]
     );
     console.log(`Updated user: ${u.username}`);
   } else {
     await run(
-      `INSERT INTO users (username, password_hash, display_name, languages, is_admin, active, created_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?)`,
-      [u.username, hash, u.displayName || u.username, languages, isAdmin, new Date().toISOString()]
+      `INSERT INTO users (username, password_hash, display_name, languages, models, is_admin, active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+      [u.username, hash, u.displayName || u.username, languages, models, isAdmin, new Date().toISOString()]
     );
     console.log(`Created user: ${u.username}`);
   }

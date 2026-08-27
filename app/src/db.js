@@ -39,6 +39,7 @@ const flagCols = FLAG_KEYS.map((k) => `${k} INTEGER NOT NULL DEFAULT 0`).join(',
 await pool.query(`
   CREATE TABLE IF NOT EXISTS rows_data (
     id SERIAL PRIMARY KEY,
+    model TEXT NOT NULL DEFAULT 'qwen',
     language TEXT NOT NULL,
     row_index INTEGER NOT NULL,
     grade TEXT,
@@ -53,11 +54,28 @@ await pool.query(`
     status TEXT NOT NULL DEFAULT 'pending',
     annotated_by TEXT,
     updated_at TEXT,
-    UNIQUE(language, row_index)
+    UNIQUE(model, language, row_index)
   );
 `);
 
-await pool.query('CREATE INDEX IF NOT EXISTS idx_rows_lang ON rows_data(language);');
+// Migration for databases created before the `model` dimension existed:
+// add the column (existing rows default to 'qwen', the only model imported
+// so far) and swap the old (language, row_index) uniqueness for
+// (model, language, row_index).
+await pool.query(`ALTER TABLE rows_data ADD COLUMN IF NOT EXISTS model TEXT NOT NULL DEFAULT 'qwen';`);
+await pool.query(`
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conname = 'rows_data_model_language_row_index_key'
+    ) THEN
+      ALTER TABLE rows_data DROP CONSTRAINT IF EXISTS rows_data_language_row_index_key;
+      ALTER TABLE rows_data ADD CONSTRAINT rows_data_model_language_row_index_key UNIQUE (model, language, row_index);
+    END IF;
+  END $$;
+`);
+
+await pool.query('CREATE INDEX IF NOT EXISTS idx_rows_model_lang ON rows_data(model, language);');
 
 await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
@@ -66,13 +84,21 @@ await pool.query(`
     password_hash TEXT NOT NULL,
     display_name TEXT,
     languages TEXT NOT NULL DEFAULT '[]',
+    models TEXT NOT NULL DEFAULT '[]',
     is_admin INTEGER NOT NULL DEFAULT 0,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT
   );
 `);
 
+await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS models TEXT NOT NULL DEFAULT '[]';`);
+
 export async function allLanguages() {
   const rows = await all('SELECT DISTINCT language FROM rows_data ORDER BY language');
   return rows.map((r) => r.language);
+}
+
+export async function allModels() {
+  const rows = await all('SELECT DISTINCT model FROM rows_data ORDER BY model');
+  return rows.map((r) => r.model);
 }

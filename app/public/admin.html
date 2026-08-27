@@ -26,14 +26,14 @@
       <h2>Export annotated data</h2>
       <p style="color:var(--text-dim);font-size:13px">Downloads an .xlsx with the original columns plus current flags, comments and review status.</p>
       <div class="form-row" id="exportButtons"></div>
-      <div class="form-row"><button class="btn secondary" id="exportAllBtn">Export all languages (one workbook)</button></div>
+      <div class="form-row"><button class="btn secondary" id="exportAllBtn">Export all models &amp; languages (one workbook)</button></div>
     </div>
 
     <div class="admin-section">
       <h2>Users</h2>
       <table class="data-table" id="usersTable">
         <thead>
-          <tr><th>Username</th><th>Display name</th><th>Languages</th><th>Admin</th><th>Active</th><th></th></tr>
+          <tr><th>Username</th><th>Display name</th><th>Models</th><th>Languages</th><th>Admin</th><th>Active</th><th></th></tr>
         </thead>
         <tbody id="usersBody"></tbody>
       </table>
@@ -48,10 +48,15 @@
         <input type="password" id="newPassword" placeholder="password" />
       </div>
       <div class="form-row">
+        <label style="width:100%;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">Models</label>
+        <div class="checkbox-list" id="newUserModels"></div>
+      </div>
+      <div class="form-row">
+        <label style="width:100%;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">Languages</label>
         <div class="checkbox-list" id="newUserLangs"></div>
       </div>
       <div class="form-row">
-        <label><input type="checkbox" id="newUserAdmin" /> Admin (access to all languages)</label>
+        <label><input type="checkbox" id="newUserAdmin" /> Admin (access to all models and languages)</label>
       </div>
       <button class="btn" id="addUserBtn">Create user</button>
     </div>

@@ -2,10 +2,10 @@ import XLSX from 'xlsx';
 import { all } from './db.js';
 import { FLAGS } from './flags.js';
 
-export async function buildWorkbookForLanguages(languages) {
+export async function buildWorkbookForModelLanguages(pairs) {
   const wb = XLSX.utils.book_new();
-  for (const language of languages) {
-    const rows = await all('SELECT * FROM rows_data WHERE language = ? ORDER BY row_index ASC', [language]);
+  for (const { model, language } of pairs) {
+    const rows = await all('SELECT * FROM rows_data WHERE model = ? AND language = ? ORDER BY row_index ASC', [model, language]);
     const sheetRows = rows.map((r) => {
       const out = {
         grade: numericOrRaw(r.grade),
@@ -20,7 +20,7 @@ export async function buildWorkbookForLanguages(languages) {
       return out;
     });
     const ws = XLSX.utils.json_to_sheet(sheetRows);
-    XLSX.utils.book_append_sheet(wb, ws, language.slice(0, 31));
+    XLSX.utils.book_append_sheet(wb, ws, `${model}_${language}`.slice(0, 31));
   }
   return wb;
 }

@@ -9,6 +9,8 @@
 <body>
   <div class="topbar">
     <div class="brand">MWP Annotator</div>
+    <span class="model-badge" id="modelBadge" style="display:none"></span>
+    <select id="modelSelect" style="display:none"></select>
     <span class="lang-badge" id="langBadge" style="display:none"></span>
     <select id="langSelect" style="display:none"></select>
     <div class="progress-wrap" id="progressWrap" style="display:none">
@@ -21,6 +23,12 @@
     <button class="btn ghost" id="logoutBtn">Log out</button>
   </div>
 
+  <!-- Model picker (shown when user has access to multiple models and none chosen yet) -->
+  <div class="main" id="modelPickerView" style="display:none">
+    <h2>Choose a model to annotate</h2>
+    <div class="lang-picker-grid" id="modelPickerGrid"></div>
+  </div>
+
   <!-- Language picker (shown when user has access to multiple languages and none chosen yet) -->
   <div class="main" id="pickerView" style="display:none">
     <h2>Choose a language to annotate</h2>
@@ -29,6 +37,14 @@
 
   <div class="layout" id="layoutView" style="display:none">
     <div class="sidebar">
+      <div class="error-info-box" id="errorInfoBox" style="display:none">
+        <div class="error-info-header">
+          <h4 id="errorInfoLabel"></h4>
+          <button type="button" class="error-info-close" id="errorInfoClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="error-info-def" id="errorInfoDef"></div>
+        <div class="error-info-ex" id="errorInfoEx"></div>
+      </div>
       <div>
         <h3>Filter</h3>
         <div class="filter-row" id="filterRow">

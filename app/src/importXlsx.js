@@ -1,7 +1,13 @@
-// One-time (or re-runnable) import: reads combined_qwen.xlsx and loads every
-// sheet (= language) into the rows_data table. Safe to re-run: existing rows
-// are matched by (language, row_index) and only the source fields are
-// refreshed — annotator-entered flags/comments/status are left untouched.
+// One-time (or re-runnable) import: reads a workbook and loads every sheet
+// (= language) into the rows_data table, tagged with the model that
+// generated the source data. Safe to re-run: existing rows are matched by
+// (model, language, row_index) and only the source fields are refreshed —
+// annotator-entered flags/comments/status are left untouched.
+//
+// Usage: node src/importXlsx.js [path/to/workbook.xlsx] [modelName]
+// If modelName is omitted it's inferred from the filename (e.g.
+// "combined_qwen.xlsx" -> "qwen"), so existing calls with no model arg keep
+// working unchanged.
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +20,15 @@ const xlsxPath = process.argv[2]
   ? path.resolve(process.argv[2])
   : path.join(__dirname, '..', '..', 'combined_qwen.xlsx');
 
+function inferModelFromFilename(p) {
+  const base = path.basename(p, path.extname(p));
+  return base.replace(/^combined[_-]?/i, '') || base;
+}
+
+const model = (process.argv[3] ? String(process.argv[3]).trim() : '') || inferModelFromFilename(xlsxPath);
+
 console.log('Reading workbook:', xlsxPath);
+console.log('Model:', model);
 const buf = fs.readFileSync(xlsxPath);
 const wb = XLSX.read(buf, { type: 'buffer' });
 
@@ -80,19 +94,23 @@ for (const sheetName of wb.SheetNames) {
     // phrased) rather than have them silently disappear.
     const isComplete = grade.trim() && topic.trim() && question.trim() ? 1 : 0;
 
-    const existing = await get('SELECT id FROM rows_data WHERE language = ? AND row_index = ?', [sheetName, rowIndex]);
+    const existing = await get('SELECT id FROM rows_data WHERE model = ? AND language = ? AND row_index = ?', [
+      model,
+      sheetName,
+      rowIndex,
+    ]);
     if (existing) {
       await run(
         `UPDATE rows_data SET grade = ?, topic = ?, question = ?, answer = ?, raw_response = ?, parse_error = ?, is_complete = ?
-         WHERE language = ? AND row_index = ?`,
-        [grade, topic, question, answer, raw, parseError, isComplete, sheetName, rowIndex]
+         WHERE model = ? AND language = ? AND row_index = ?`,
+        [grade, topic, question, answer, raw, parseError, isComplete, model, sheetName, rowIndex]
       );
       totalUpdated += 1;
     } else {
       await run(
-        `INSERT INTO rows_data (language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete]
+        `INSERT INTO rows_data (model, language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [model, sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete]
       );
       totalInserted += 1;
     }

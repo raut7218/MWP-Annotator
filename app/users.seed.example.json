@@ -4,6 +4,7 @@
     "password": "change-me-admin",
     "displayName": "Admin",
     "languages": ["*"],
+    "models": ["*"],
     "isAdmin": true
   },
   {
@@ -11,6 +12,7 @@
     "password": "change-me-hindi",
     "displayName": "Hindi Annotator",
     "languages": ["Hindi"],
+    "models": ["qwen"],
     "isAdmin": false
   },
   {
@@ -18,6 +20,7 @@
     "password": "change-me-marathi",
     "displayName": "Marathi Annotator",
     "languages": ["Marathi"],
+    "models": ["qwen"],
     "isAdmin": false
   }
 ]

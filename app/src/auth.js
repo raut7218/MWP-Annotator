@@ -19,6 +19,7 @@ function sanitize(user) {
     username: user.username,
     displayName: user.display_name,
     languages: JSON.parse(user.languages || '[]'),
+    models: JSON.parse(user.models || '[]'),
     isAdmin: !!user.is_admin,
   };
 }
@@ -33,6 +34,18 @@ export function canAccessLanguage(user, language) {
   if (!user) return false;
   if (user.isAdmin || user.languages.includes('*')) return true;
   return user.languages.includes(language);
+}
+
+export function userModels(user) {
+  if (!user) return [];
+  if (user.isAdmin || user.models.includes('*')) return null; // null = all
+  return user.models;
+}
+
+export function canAccessModel(user, model) {
+  if (!user) return false;
+  if (user.isAdmin || user.models.includes('*')) return true;
+  return user.models.includes(model);
 }
 
 export async function requireLogin(req, res, next) {

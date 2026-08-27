@@ -1,9 +1,11 @@
 # MWP Annotator
 
 A web app for reviewing and annotating machine-generated math word problems
-(MWPs) across six languages — Sinhala, Tamil, Punjabi, Odia, Marathi, and
-Hindi — one problem at a time, with per-language logins so each annotator
-only sees the language they're assigned to.
+(MWPs), one problem at a time, with per-model and per-language logins so each
+annotator only sees the model/language combination they're assigned to. The
+first imported source is `combined_qwen.xlsx` (six languages — Sinhala,
+Tamil, Punjabi, Odia, Marathi, and Hindi); further workbooks from other
+models can be imported alongside it without mixing data.
 
 ## Repository layout
 
