@@ -16,7 +16,7 @@
       <div class="progress-text" id="progressText">0 / 0</div>
     </div>
     <div class="spacer"></div>
-    <button class="btn ghost" data-open-reference="guidelines">&#128218; Reference</button>
+    <a class="btn ghost" href="reference.html?tab=guidelines" target="_blank" rel="noopener">&#128218; Reference</a>
     <span class="user-chip" id="userChip"></span>
     <button class="btn ghost" id="logoutBtn">Log out</button>
   </div>
@@ -53,6 +53,14 @@
         <div><span class="dot" style="background:var(--green-bg)"></span>Reviewed, no issues</div>
         <div><span class="dot" style="background:var(--orange-bg)"></span>Reviewed, flagged</div>
       </div>
+      <div>
+        <h3>Reference</h3>
+        <div class="ref-links">
+          <a href="reference.html?tab=guidelines" target="_blank" rel="noopener">Guidelines</a>
+          <a href="reference.html?tab=categories" target="_blank" rel="noopener">Error categories</a>
+          <a href="reference.html?tab=examples" target="_blank" rel="noopener">Example questions (NCERT)</a>
+        </div>
+      </div>
     </div>
 
     <div class="main">
@@ -80,7 +88,7 @@
         <div class="flags-section">
           <div class="qa-label" style="display:flex;align-items:center;justify-content:space-between">
             <span>Issues (check all that apply)</span>
-            <button type="button" class="btn ghost" style="padding:3px 10px;font-size:11.5px" data-open-reference="categories">View definitions &amp; examples</button>
+            <a class="btn ghost" style="padding:3px 10px;font-size:11.5px" href="reference.html?tab=categories" target="_blank" rel="noopener">View definitions &amp; examples</a>
           </div>
           <div class="flags-grid" id="flagsGrid"></div>
         </div>
@@ -108,7 +116,6 @@
 
   <div class="main center-msg" id="emptyView" style="display:none"></div>
 
-  <script src="js/reference.js"></script>
   <script src="js/annotate.js"></script>
 </body>
 </html>

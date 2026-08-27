@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Annotation reference — MWP Annotator</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body { background: var(--bg); }
+    .ref-header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .ref-header h1 { margin: 0 0 12px; font-size: 17px; }
+    .ref-tabs { display: flex; gap: 4px; }
+    .ref-tabs button {
+      border: none; background: transparent; padding: 9px 14px; font-weight: 600;
+      font-size: 13.5px; color: var(--text-dim); border-bottom: 2px solid transparent; cursor: pointer;
+    }
+    .ref-tabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .ref-body { max-width: 920px; margin: 0 auto; padding: 22px 24px 60px; }
+    .ref-guideline-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; line-height: 1.55; }
+    .ref-guideline-item:last-child { border-bottom: none; }
+    .ref-guideline-item .num { font-weight: 700; color: var(--primary); flex-shrink: 0; }
+    .ref-cat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; scroll-margin-top: 90px; }
+    .ref-cat-card.highlight { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(52,87,213,0.18); }
+    .ref-cat-card h4 { margin: 0 0 4px; font-size: 14px; }
+    .ref-cat-card .def { font-size: 13.5px; margin-bottom: 6px; }
+    .ref-cat-card .ex { font-size: 12.5px; color: var(--text-dim); background: var(--gray-bg); border-radius: 6px; padding: 7px 10px; }
+    .ref-ex-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; position: sticky; top: 52px; background: var(--bg); padding: 8px 0; }
+    .ref-ex-filters select, .ref-ex-filters input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--panel); }
+    .ref-ex-filters input[type=text] { flex: 1; min-width: 160px; }
+    table.ref-ex-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); }
+    table.ref-ex-table th, table.ref-ex-table td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table.ref-ex-table th { color: var(--text-dim); font-size: 11px; text-transform: uppercase; }
+    .ref-ex-count { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="ref-header">
+    <h1>Annotation reference</h1>
+    <nav class="ref-tabs">
+      <button data-tab="guidelines">Guidelines</button>
+      <button data-tab="categories">Error categories</button>
+      <button data-tab="examples">Example questions (NCERT)</button>
+    </nav>
+  </div>
+  <div class="ref-body" id="refBody"></div>
+
+  <script src="js/reference-page.js"></script>
+</body>
+</html>

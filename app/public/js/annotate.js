@@ -204,14 +204,12 @@ function renderFlags(flagValues) {
     wrap.innerHTML = `
       <input type="checkbox" data-key="${f.key}" ${flagValues[f.key] ? 'checked' : ''} />
       <span>
-        <div class="flabel">${escapeHtml(f.label)} <a href="#" class="finfo" title="View definition & example">ⓘ</a></div>
+        <div class="flabel">${escapeHtml(f.label)} <a href="reference.html?tab=categories&focus=${encodeURIComponent(f.key)}" target="_blank" rel="noopener" class="finfo" title="View definition & example">ⓘ</a></div>
         <div class="fhint">${escapeHtml(f.hint)}</div>
       </span>
     `;
     wrap.querySelector('.finfo').addEventListener('click', (e) => {
-      e.preventDefault();
       e.stopPropagation();
-      window.openReferenceModal('categories', f.key);
     });
     const input = wrap.querySelector('input');
     input.addEventListener('change', () => {
