@@ -2,3 +2,8 @@ node_modules/
 data/
 users.seed.json
 *.log
+
+# Connection strings and other secrets — this repo is public.
+.env
+.env.*
+!.env.example
