@@ -71,27 +71,12 @@ npm install
 export DATABASE_URL="postgres://user:pass@host:5432/dbname"
 ```
 
-### Importing from the browser (no shell needed)
+### Loading data: generate a .sql file (no credentials needed)
 
-Admin panel → **Import workbook**. Choose the `.xlsx`, press **Preview**: the
-file is parsed and summarised — format detected, models, languages, learning
-objectives, row counts, anything repaired, and the first few rows — and
-**nothing is written**. Press **Import into database** to commit.
-
-This is the only route that works against a hosted database (Neon, Render)
-without a shell, and it keeps the workbooks out of the repo. Supporting a new
-sheet layout means adding a parser under `src/importers/` that returns the
-shared record shape; the upload page picks it up with no schema change.
-
-Admin panel → **Delete imported data** clears one model/language when a sheet
-was imported wrongly. It deletes the problems *and every annotation on them*,
-so it asks for the row count back as confirmation.
-
-### Generating a .sql file (no credentials, no shell on the server)
-
-For a hosted database you can also skip connecting entirely: parse the
-workbook here and run the resulting SQL in Neon's SQL editor (or psql, or
-pgAdmin).
+The workbooks are gitignored, and a hosted database (Neon, Render) has no
+shell to run an importer in — so the usual route is to parse the workbook
+locally and run the resulting SQL in Neon's SQL editor (or psql, or pgAdmin).
+Nothing has to be given a connection string.
 
 ```bash
 npm run seed-sql -- --out=evaluation_seed.sql
@@ -141,8 +126,8 @@ leading `combined_`).
 
 Both importers are safe to re-run at any time to pick up new rows: they match
 on (model, language, row number), refresh only the source columns, and never
-touch annotations already saved. The CLI and the browser upload share the same
-parsers (`src/importers/`), so they behave identically.
+touch annotations already saved. The CLI importers and the `.sql` generator
+share the same parsers (`src/importers/`), so they behave identically.
 
 **A restart does not load data.** Booting the app creates and migrates the
 tables but imports nothing, so until a workbook has been imported the admin
@@ -165,6 +150,12 @@ any small server/VM — it's a plain Node process, no build step needed).
 If you previously ran this app against the old local SQLite file
 (`app/data/app.db`) and want to carry over existing annotator progress,
 run `npm run migrate-to-pg` once (with `DATABASE_URL` set).
+
+### Clearing a sheet
+
+Admin panel → **Delete imported data** removes one model/language when a sheet
+was loaded wrongly. It deletes the problems *and every annotation on them*, so
+it asks for the current row count back as confirmation.
 
 ## Managing access per model and language
 

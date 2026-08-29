@@ -45,8 +45,14 @@ npm run seed
 npm start
 ```
 
-Then log in as an admin and use **Admin panel → Import workbook** to upload
-`MWPs/evaluation.xlsx`. (There is also a CLI importer if you prefer a shell —
-see [app/README.md](app/README.md).) Starting the server creates the tables
-but loads no problems; until a workbook is imported the admin panel lists no
-languages or models.
+Starting the server creates the tables but loads no problems. To load them,
+generate a `.sql` file from the workbook and run it in your database console
+(Neon's SQL editor, psql, pgAdmin) — no connection string has to be shared:
+
+```bash
+npm run seed-sql -- --out=evaluation_seed.sql
+```
+
+Until a workbook is loaded the admin panel lists no languages or models. See
+[app/README.md](app/README.md) for the CLI importers, if you have shell access
+to the database instead.

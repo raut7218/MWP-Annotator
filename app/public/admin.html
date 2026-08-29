@@ -23,31 +23,6 @@
     </div>
 
     <div class="admin-section">
-      <h2>Import workbook</h2>
-      <p style="color:var(--text-dim);font-size:13px">
-        Load a sheet of generated problems straight into the database. The file is parsed and
-        summarised first — nothing is written until you confirm. Re-importing the same sheet
-        refreshes the problem text and never touches annotations already saved.
-      </p>
-      <div class="form-row">
-        <input type="file" id="importFile" accept=".xlsx,.xls" />
-        <select id="importFormat"><option value="">Detect format automatically</option></select>
-      </div>
-      <div class="form-row" id="importEvalOpts">
-        <label class="inline-field">Problem language <input type="text" id="importLanguage" value="Māori" /></label>
-        <label class="inline-field">Sheet (optional) <input type="text" id="importSheet" placeholder="first sheet" /></label>
-      </div>
-      <div class="form-row" id="importCombinedOpts" style="display:none">
-        <label class="inline-field">Model name <input type="text" id="importModel" placeholder="from filename" /></label>
-      </div>
-      <div class="form-row">
-        <button class="btn secondary" id="importPreviewBtn">Preview</button>
-        <button class="btn success" id="importCommitBtn" style="display:none">Import into database</button>
-      </div>
-      <div id="importResult"></div>
-    </div>
-
-    <div class="admin-section">
       <h2>Export annotated data</h2>
       <p style="color:var(--text-dim);font-size:13px">Downloads an .xlsx with the problem, its learning objective, the model that generated it, and one row per annotator with their flags, comments and review status.</p>
       <div class="form-row" id="exportButtons"></div>

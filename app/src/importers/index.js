@@ -1,8 +1,8 @@
-// Picks a parser for an uploaded workbook, runs it, and writes the result.
+// Picks a parser for a workbook and runs it.
 //
 // Adding support for a new sheet layout means adding a parser that returns the
-// shape below and teaching `detectFormat` to recognise it — no schema change,
-// and the admin upload page picks it up for free.
+// shared record shape and teaching `detectFormat` to recognise it — no schema
+// change, and every caller (the CLI importers, the .sql generator) gets it.
 import XLSX from 'xlsx';
 import { normalise } from './cells.js';
 import { parseEvaluationWorkbook } from './evaluationSheet.js';
@@ -14,14 +14,9 @@ export { parseEvaluationWorkbook, parseCombinedWorkbook };
 // need to read a workbook (e.g. src/exportSeedSql.js) work without a
 // DATABASE_URL. Writing lives in ./persist.js.
 
-export const FORMATS = [
-  { id: 'evaluation', label: 'Evaluation sheet (Grade | LLM | LO | Question | Answer)' },
-  { id: 'combined', label: 'Combined workbook (one sheet per language, JSON response)' },
-];
-
-// Sniff the first sheet's header row. Explicit beats clever: the admin page
-// shows what was detected and lets you override it before anything is written.
-export function detectFormat(buffer) {
+// Sniff the first sheet's header row, so a caller that does not name a format
+// still gets the right parser. `--format=` overrides it.
+function detectFormat(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer', sheetRows: 1 });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws || !ws['!ref']) return null;
