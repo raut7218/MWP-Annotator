@@ -41,7 +41,12 @@ Quick start:
 cd app
 npm install
 export DATABASE_URL="postgres://user:pass@host:5432/dbname"
-npm run import-evaluation
 npm run seed
 npm start
 ```
+
+Then log in as an admin and use **Admin panel → Import workbook** to upload
+`MWPs/evaluation.xlsx`. (There is also a CLI importer if you prefer a shell —
+see [app/README.md](app/README.md).) Starting the server creates the tables
+but loads no problems; until a workbook is imported the admin panel lists no
+languages or models.

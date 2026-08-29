@@ -71,7 +71,23 @@ npm install
 export DATABASE_URL="postgres://user:pass@host:5432/dbname"
 ```
 
-### Importing the te reo Māori evaluation workbook
+### Importing from the browser (no shell needed)
+
+Admin panel → **Import workbook**. Choose the `.xlsx`, press **Preview**: the
+file is parsed and summarised — format detected, models, languages, learning
+objectives, row counts, anything repaired, and the first few rows — and
+**nothing is written**. Press **Import into database** to commit.
+
+This is the only route that works against a hosted database (Neon, Render)
+without a shell, and it keeps the workbooks out of the repo. Supporting a new
+sheet layout means adding a parser under `src/importers/` that returns the
+shared record shape; the upload page picks it up with no schema change.
+
+Admin panel → **Delete imported data** clears one model/language when a sheet
+was imported wrongly. It deletes the problems *and every annotation on them*,
+so it asks for the row count back as confirmation.
+
+### Importing the te reo Māori evaluation workbook (CLI)
 
 `MWPs/evaluation.xlsx` has a single sheet of `Grade | LLM | LO | Question |
 Answer` rows, blocked by learning objective. Each learning objective appears
@@ -94,7 +110,7 @@ are filled down through their blocks, and answers that are fractions
 ("5/8", "3/4") which Excel silently stored as dates are converted back to
 the original text rather than exported as "46239".
 
-### Importing a `combined_*.xlsx` workbook
+### Importing a `combined_*.xlsx` workbook (CLI)
 
 One sheet per language, each row a JSON `response`:
 
@@ -108,7 +124,14 @@ leading `combined_`).
 
 Both importers are safe to re-run at any time to pick up new rows: they match
 on (model, language, row number), refresh only the source columns, and never
-touch annotations already saved.
+touch annotations already saved. The CLI and the browser upload share the same
+parsers (`src/importers/`), so they behave identically.
+
+**A restart does not load data.** Booting the app creates and migrates the
+tables but imports nothing, so until a workbook has been imported the admin
+panel shows no languages or models — `SELECT DISTINCT language FROM rows_data`
+on an empty table is empty. If the language you expect is missing, that is
+almost always what happened.
 
 ### Accounts
 
@@ -174,6 +197,13 @@ objectives or annotators never requires reshaping the others:
   column on next boot.
 - **`users`** — accounts, their model/language access, admin bit, and
   `can_see_model`.
+
+Everything an annotator sees is served from these tables — questions, answers,
+grades, learning objectives and their per-language wording, model and language
+lists. Nothing is embedded in the HTML or JS. The only content still read from
+disk is the static reference material in `app/reference/` (guidelines, error
+category definitions, NCERT examples), which is identical across deployments
+and versioned in git.
 
 Schema changes are applied on boot by `src/db.js` and are idempotent, so
 deploying is just restarting the process. Databases from before this change

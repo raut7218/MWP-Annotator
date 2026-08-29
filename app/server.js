@@ -17,6 +17,9 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 
 const PgSession = connectPgSimple(session);
 
+// Workbook uploads arrive as a raw binary body on the admin import routes;
+// everything else is JSON.
+app.use('/api/admin/import', express.raw({ type: '*/*', limit: '25mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(
   session({

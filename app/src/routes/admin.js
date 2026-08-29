@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import { all, get, run, allLanguages, allModels } from '../db.js';
 import { FLAG_KEYS } from '../flags.js';
 import { buildWorkbookForModelLanguages, workbookToBuffer } from '../exportXlsx.js';
+import { FORMATS, detectFormat, parseWorkbook, persistParsed, summarise } from '../importers/index.js';
+import { invalidateModelsCache } from '../db.js';
 
 export const adminRouter = Router();
 
@@ -133,6 +135,103 @@ adminRouter.get('/export-all', async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="combined_annotated.xlsx"');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
+});
+
+// ---------------------------------------------------------------------------
+// Importing a workbook from the browser.
+//
+// The workbooks are not in the repo (they hold unpublished generations), and
+// the hosted app has no shell, so uploading is the only way to get a sheet
+// into the database. Two steps on purpose: parse and show what was found,
+// then write only once the admin has looked at it.
+//
+// The file arrives as the raw request body rather than multipart — it is a
+// single binary blob, so there is nothing a form encoding would add beyond a
+// dependency.
+// ---------------------------------------------------------------------------
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+adminRouter.get('/import/formats', (req, res) => {
+  res.json({ formats: FORMATS });
+});
+
+function parseFromRequest(req) {
+  const buffer = req.body;
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    const err = new Error('No file received. Choose an .xlsx file and try again.');
+    err.status = 400;
+    throw err;
+  }
+  const q = req.query || {};
+  const sourceFile = String(q.filename || 'upload.xlsx');
+  const format = q.format ? String(q.format) : null;
+  const detected = detectFormat(buffer);
+  const parsed = parseWorkbook(buffer, {
+    format: format || detected,
+    language: q.language ? String(q.language) : 'Māori',
+    sheet: q.sheet ? String(q.sheet) : null,
+    model: q.model ? String(q.model).trim() : inferModel(sourceFile),
+    sourceFile,
+  });
+  return { parsed, detected };
+}
+
+// Mirrors the CLI's filename convention so an uploaded `combined_llama.xlsx`
+// needs no extra typing.
+function inferModel(filename) {
+  const base = String(filename).replace(/\.[^.]+$/, '');
+  return base.replace(/^combined[_-]?/i, '') || base;
+}
+
+adminRouter.post('/import/preview', async (req, res) => {
+  try {
+    const { parsed, detected } = parseFromRequest(req);
+    res.json({ detected, summary: summarise(parsed) });
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+adminRouter.post('/import/commit', async (req, res) => {
+  try {
+    const { parsed, detected } = parseFromRequest(req);
+    const result = await persistParsed(parsed);
+    res.json({ detected, summary: summarise(parsed), result });
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+// Clearing a sheet that was imported wrongly. Deleting the rows cascades to
+// their annotations, so this asks for the exact row count back as
+// confirmation rather than trusting a button press.
+adminRouter.delete('/data/:model/:language', async (req, res) => {
+  const { model, language } = req.params;
+  const counts = await get(
+    `SELECT COUNT(*)::int AS rows,
+            (SELECT COUNT(*)::int FROM annotations a JOIN rows_data r2 ON r2.id = a.row_id
+              WHERE r2.model = ? AND r2.language = ?) AS annotations
+     FROM rows_data WHERE model = ? AND language = ?`,
+    [model, language, model, language]
+  );
+  if (!counts.rows) return res.status(404).json({ error: 'Nothing imported for that model and language' });
+  if (Number(req.query.confirmRows) !== counts.rows) {
+    return res.status(409).json({
+      error: `Refusing to delete: expected confirmRows=${counts.rows}`,
+      rows: counts.rows,
+      annotations: counts.annotations,
+    });
+  }
+  await run('DELETE FROM rows_data WHERE model = ? AND language = ?', [model, language]);
+  // Learning objectives can outlive the rows that referenced them; drop the
+  // ones nothing points at any more so the list does not silently grow.
+  await run(
+    `DELETE FROM learning_objectives lo
+      WHERE NOT EXISTS (SELECT 1 FROM rows_data r WHERE r.lo_id = lo.id)`
+  );
+  invalidateModelsCache();
+  res.json({ ok: true, deletedRows: counts.rows, deletedAnnotations: counts.annotations });
 });
 
 // Language names like "Māori" are fine in a sheet name but not in a bare
