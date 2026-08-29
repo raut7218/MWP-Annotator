@@ -11,7 +11,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseCombinedWorkbook, persistParsed, summarise } from './importers/index.js';
+import { parseCombinedWorkbook, summarise } from './importers/index.js';
+import { persistParsed } from './importers/persist.js';
 import { FLAG_KEYS } from './flags.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import { all, get, run, allLanguages, allModels } from '../db.js';
 import { FLAG_KEYS } from '../flags.js';
 import { buildWorkbookForModelLanguages, workbookToBuffer } from '../exportXlsx.js';
-import { FORMATS, detectFormat, parseWorkbook, persistParsed, summarise } from '../importers/index.js';
+import { FORMATS, detectFormat, parseWorkbook, summarise } from '../importers/index.js';
+import { persistParsed } from '../importers/persist.js';
 import { invalidateModelsCache } from '../db.js';
 
 export const adminRouter = Router();

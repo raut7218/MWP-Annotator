@@ -9,7 +9,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseEvaluationWorkbook, persistParsed, summarise } from './importers/index.js';
+import { parseEvaluationWorkbook, summarise } from './importers/index.js';
+import { persistParsed } from './importers/persist.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);

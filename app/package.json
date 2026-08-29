@@ -13,7 +13,8 @@
     "migrate-to-pg": "node src/migrateSqliteToPg.js",
     "start": "node server.js",
     "dev": "node server.js",
-    "import-evaluation": "node src/importEvaluationXlsx.js"
+    "import-evaluation": "node src/importEvaluationXlsx.js",
+    "seed-sql": "node src/exportSeedSql.js"
   },
   "license": "ISC",
   "dependencies": {

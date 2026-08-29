@@ -87,6 +87,23 @@ Admin panel → **Delete imported data** clears one model/language when a sheet
 was imported wrongly. It deletes the problems *and every annotation on them*,
 so it asks for the row count back as confirmation.
 
+### Generating a .sql file (no credentials, no shell on the server)
+
+For a hosted database you can also skip connecting entirely: parse the
+workbook here and run the resulting SQL in Neon's SQL editor (or psql, or
+pgAdmin).
+
+```bash
+npm run seed-sql -- --out=evaluation_seed.sql
+node src/exportSeedSql.js path/to/file.xlsx --out=seed.sql --language=Māori
+```
+
+This needs no `DATABASE_URL` — the parsers carry no database dependency, which
+is why `src/importers/persist.js` is separate from the rest of
+`src/importers/`. The generated file upserts every row, so it is safe to run
+twice, and it never touches the `annotations` table. It assumes the schema
+already exists, i.e. the app has been started against that database once.
+
 ### Importing the te reo Māori evaluation workbook (CLI)
 
 `MWPs/evaluation.xlsx` has a single sheet of `Grade | LLM | LO | Question |
