@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { all, get, run } from '../db.js';
+import { all, get, run, allModels } from '../db.js';
 import { FLAGS, FLAG_KEYS } from '../flags.js';
 import { canAccessLanguage, canAccessModel, userLanguages, userModels } from '../auth.js';
+import { describeModel, modelFromRef } from '../models.js';
 import { guidelines, errorCategories, ncertExamples, ncertGrades, ncertTopics } from '../reference.js';
 
 export const rowsRouter = Router();
@@ -37,92 +38,154 @@ rowsRouter.get('/reference/examples', (req, res) => {
   res.json({ items: items.slice(0, 1000), total: items.length });
 });
 
-const flaggedExpr = FLAG_KEYS.map((k) => `${k} = 1`).join(' OR ');
+// Progress is per annotator: with several people on the same model/language
+// sheet, "done" means done *by you*, so everyone gets their own bar.
+const flaggedExpr = FLAG_KEYS.map((k) => `a.${k} = 1`).join(' OR ');
 
 const modelStatsSql = `
   SELECT
-    model,
+    r.model,
     COUNT(*)::int AS total,
-    SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END)::int AS done,
+    SUM(CASE WHEN a.status = 'reviewed' THEN 1 ELSE 0 END)::int AS done,
     SUM(CASE WHEN ${flaggedExpr} THEN 1 ELSE 0 END)::int AS flagged
-  FROM rows_data
-  WHERE is_complete = 1 AND ($1::text[] IS NULL OR language = ANY($1))
-  GROUP BY model
-  ORDER BY model
+  FROM rows_data r
+  LEFT JOIN annotations a ON a.row_id = r.id AND a.user_id = $1
+  WHERE r.is_complete = 1 AND ($2::text[] IS NULL OR r.language = ANY($2))
+  GROUP BY r.model
+  ORDER BY r.model
 `;
 
 const languageStatsSql = `
   SELECT
-    language,
+    r.language,
     COUNT(*)::int AS total,
-    SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END)::int AS done,
+    SUM(CASE WHEN a.status = 'reviewed' THEN 1 ELSE 0 END)::int AS done,
     SUM(CASE WHEN ${flaggedExpr} THEN 1 ELSE 0 END)::int AS flagged
-  FROM rows_data
-  WHERE model = ? AND is_complete = 1
-  GROUP BY language
-  ORDER BY language
+  FROM rows_data r
+  LEFT JOIN annotations a ON a.row_id = r.id AND a.user_id = $1
+  WHERE r.model = $2 AND r.is_complete = 1
+  GROUP BY r.language
+  ORDER BY r.language
+`;
+
+const listSql = `
+  SELECT r.id, r.row_index, r.grade, r.lo_language,
+         COALESCE(a.status, 'pending') AS status,
+         (${flaggedExpr}) AS flagged
+  FROM rows_data r
+  LEFT JOIN annotations a ON a.row_id = r.id AND a.user_id = $1
+  WHERE r.model = $2 AND r.language = $3 AND r.is_complete = 1
+  ORDER BY r.row_index ASC
 `;
 
 rowsRouter.get('/flags', (req, res) => {
   res.json({ flags: FLAGS });
 });
 
+// Resolves the :modelRef path segment to a real model name, enforcing access.
+// Returns null (and sends the response) when the caller may not have it.
+async function resolveModel(req, res) {
+  const known = await allModels();
+  const model = modelFromRef(req.params.modelRef, known);
+  if (!model || !canAccessModel(req.user, model)) {
+    res.status(403).json({ error: 'No access to this model' });
+    return null;
+  }
+  return model;
+}
+
 rowsRouter.get('/models', async (req, res) => {
   const allowedModels = userModels(req.user); // null = all
   const allowedLangs = userLanguages(req.user); // null = all
-  const stats = (await all(modelStatsSql, [allowedLangs])).filter(
+  const sorted = await allModels();
+  const stats = (await all(modelStatsSql, [req.user.id, allowedLangs])).filter(
     (s) => allowedModels === null || allowedModels.includes(s.model)
   );
-  res.json({ models: stats });
+  res.json({
+    models: stats.map((s) => ({
+      ...describeModel(s.model, req.user, sorted),
+      total: s.total,
+      done: s.done,
+      flagged: s.flagged,
+    })),
+  });
 });
 
-rowsRouter.get('/models/:model/languages', async (req, res) => {
-  const { model } = req.params;
-  if (!canAccessModel(req.user, model)) return res.status(403).json({ error: 'No access to this model' });
+rowsRouter.get('/models/:modelRef/languages', async (req, res) => {
+  const model = await resolveModel(req, res);
+  if (!model) return;
   const allowedLangs = userLanguages(req.user); // null = all
-  const stats = (await all(languageStatsSql, [model])).filter(
+  const stats = (await all(languageStatsSql, [req.user.id, model])).filter(
     (s) => allowedLangs === null || allowedLangs.includes(s.language)
   );
   res.json({ languages: stats });
 });
 
-const listSql = `
-  SELECT id, row_index, status, (${flaggedExpr}) AS flagged
-  FROM rows_data WHERE model = ? AND language = ? AND is_complete = 1 ORDER BY row_index ASC
-`;
-
-rowsRouter.get('/rows/:model/:language/list', async (req, res) => {
-  const { model, language } = req.params;
-  if (!canAccessModel(req.user, model)) return res.status(403).json({ error: 'No access to this model' });
+rowsRouter.get('/rows/:modelRef/:language/list', async (req, res) => {
+  const model = await resolveModel(req, res);
+  if (!model) return;
+  const { language } = req.params;
   if (!canAccessLanguage(req.user, language)) return res.status(403).json({ error: 'No access to this language' });
-  const items = (await all(listSql, [model, language])).map((r) => ({ ...r, flagged: !!r.flagged }));
+  const items = (await all(listSql, [req.user.id, model, language])).map((r) => ({
+    id: r.id,
+    row_index: r.row_index,
+    grade: r.grade,
+    loLanguage: r.lo_language,
+    status: r.status,
+    flagged: !!r.flagged,
+  }));
   res.json({ items });
 });
 
-rowsRouter.get('/rows/:model/:language/:rowIndex', async (req, res) => {
-  const { model, language } = req.params;
+const rowDetailSql = `
+  SELECT r.*, lo.code AS lo_code, lo.ordinal AS lo_ordinal,
+         a.id AS annotation_id, a.status AS annotation_status, a.comments AS annotation_comments,
+         a.updated_at AS annotation_updated_at,
+         ${FLAG_KEYS.map((k) => `a.${k} AS flag_${k}`).join(', ')}
+  FROM rows_data r
+  LEFT JOIN learning_objectives lo ON lo.id = r.lo_id
+  LEFT JOIN annotations a ON a.row_id = r.id AND a.user_id = $1
+  WHERE r.model = $2 AND r.language = $3 AND r.row_index = $4 AND r.is_complete = 1
+`;
+
+rowsRouter.get('/rows/:modelRef/:language/:rowIndex', async (req, res) => {
+  const model = await resolveModel(req, res);
+  if (!model) return;
+  const { language } = req.params;
   const rowIndex = Number(req.params.rowIndex);
-  if (!canAccessModel(req.user, model)) return res.status(403).json({ error: 'No access to this model' });
   if (!canAccessLanguage(req.user, language)) return res.status(403).json({ error: 'No access to this language' });
-  const row = await get('SELECT * FROM rows_data WHERE model = ? AND language = ? AND row_index = ? AND is_complete = 1', [
-    model,
-    language,
-    rowIndex,
-  ]);
+  const row = await get(rowDetailSql, [req.user.id, model, language, rowIndex]);
   if (!row) return res.status(404).json({ error: 'Row not found' });
-  const totalRow = await get('SELECT COUNT(*)::int AS c FROM rows_data WHERE model = ? AND language = ? AND is_complete = 1', [
-    model,
-    language,
-  ]);
-  res.json({ row: shapeRow(row), total: totalRow.c });
+  const totalRow = await get(
+    'SELECT COUNT(*)::int AS c FROM rows_data WHERE model = ? AND language = ? AND is_complete = 1',
+    [model, language]
+  );
+  // How many other people have already reviewed this same problem — useful
+  // context when a sheet is double-annotated, and it never reveals what they
+  // said.
+  const others = await get(
+    `SELECT COUNT(*)::int AS c FROM annotations WHERE row_id = ? AND user_id <> ? AND status = 'reviewed'`,
+    [row.id, req.user.id]
+  );
+  const sorted = await allModels();
+  res.json({ row: shapeRow(row, req.user, sorted), total: totalRow.c, otherAnnotators: others.c });
 });
 
-const updateCols = [...FLAG_KEYS, 'comments', 'status', 'annotated_by', 'updated_at'];
-const updateSql = `UPDATE rows_data SET ${updateCols.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`;
+const upsertSql = `
+  INSERT INTO annotations (row_id, user_id, ${FLAG_KEYS.join(', ')}, comments, status, created_at, updated_at)
+  VALUES (?, ?, ${FLAG_KEYS.map(() => '?').join(', ')}, ?, ?, now(), now())
+  ON CONFLICT (row_id, user_id) DO UPDATE SET
+    ${FLAG_KEYS.map((k) => `${k} = EXCLUDED.${k}`).join(',\n    ')},
+    comments = EXCLUDED.comments,
+    status = EXCLUDED.status,
+    updated_at = now()
+`;
 
-rowsRouter.put('/rows/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const existing = await get('SELECT * FROM rows_data WHERE id = ?', [id]);
+// Saves *this* annotator's take on a problem. Two annotators saving the same
+// problem write two rows, neither overwriting the other.
+rowsRouter.put('/annotations/:rowId', async (req, res) => {
+  const rowId = Number(req.params.rowId);
+  const existing = await get('SELECT * FROM rows_data WHERE id = ?', [rowId]);
   if (!existing) return res.status(404).json({ error: 'Row not found' });
   if (!canAccessModel(req.user, existing.model)) return res.status(403).json({ error: 'No access to this model' });
   if (!canAccessLanguage(req.user, existing.language)) return res.status(403).json({ error: 'No access to this language' });
@@ -132,37 +195,40 @@ rowsRouter.put('/rows/:id', async (req, res) => {
   const status = body.status === 'reviewed' ? 'reviewed' : 'pending';
   const comments = typeof body.comments === 'string' ? body.comments : '';
 
-  const values = [
+  await run(upsertSql, [
+    rowId,
+    req.user.id,
     ...FLAG_KEYS.map((k) => (flags[k] ? 1 : 0)),
     comments,
     status,
-    req.user.displayName || req.user.username,
-    new Date().toISOString(),
-    id,
-  ];
-  await run(updateSql, values);
-  const updated = await get('SELECT * FROM rows_data WHERE id = ?', [id]);
-  res.json({ row: shapeRow(updated) });
+  ]);
+
+  const sorted = await allModels();
+  const updated = await get(rowDetailSql, [req.user.id, existing.model, existing.language, existing.row_index]);
+  res.json({ row: shapeRow(updated, req.user, sorted) });
 });
 
-function shapeRow(r) {
+function shapeRow(r, user, allModelsSorted) {
   const flags = {};
-  for (const k of FLAG_KEYS) flags[k] = !!r[k];
+  for (const k of FLAG_KEYS) flags[k] = !!r[`flag_${k}`];
   return {
     id: r.id,
-    model: r.model,
+    model: describeModel(r.model, user, allModelsSorted),
     language: r.language,
     rowIndex: r.row_index,
     grade: r.grade,
     topic: r.topic,
+    learningObjective: r.learning_objective || '',
+    loLanguage: r.lo_language || '',
+    loCode: r.lo_code || '',
     question: r.question,
     answer: r.answer,
     parseError: !!r.parse_error,
     rawResponse: r.raw_response,
     flags,
-    comments: r.comments || '',
-    status: r.status,
-    annotatedBy: r.annotated_by,
-    updatedAt: r.updated_at,
+    comments: r.annotation_comments || '',
+    status: r.annotation_status || 'pending',
+    annotatedBy: r.annotation_id ? user.displayName || user.username : null,
+    updatedAt: r.annotation_updated_at,
   };
 }

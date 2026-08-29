@@ -21,6 +21,8 @@ function sanitize(user) {
     languages: JSON.parse(user.languages || '[]'),
     models: JSON.parse(user.models || '[]'),
     isAdmin: !!user.is_admin,
+    // Admins always see model names; for annotators it is an admin-set switch.
+    canSeeModel: !!user.is_admin || !!user.can_see_model,
   };
 }
 

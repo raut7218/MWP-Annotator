@@ -25,7 +25,7 @@
 
   <!-- Model picker (shown when user has access to multiple models and none chosen yet) -->
   <div class="main" id="modelPickerView" style="display:none">
-    <h2>Choose a model to annotate</h2>
+    <h2>Choose a set to annotate</h2>
     <div class="lang-picker-grid" id="modelPickerGrid"></div>
   </div>
 
@@ -53,6 +53,10 @@
           <button class="chip" data-filter="reviewed">Reviewed</button>
           <button class="chip" data-filter="flagged">Flagged</button>
         </div>
+      </div>
+      <div id="loFilterBlock" style="display:none">
+        <h3>LO language</h3>
+        <div class="filter-row" id="loFilterRow"></div>
       </div>
       <div>
         <h3>Jump to #</h3>
@@ -83,10 +87,19 @@
       <div class="card" id="card">
         <div class="meta-row">
           <span class="pill grade" id="pillGrade"></span>
-          <span class="pill" id="pillTopic"></span>
+          <span class="pill" id="pillTopic" style="display:none"></span>
+          <span class="pill" id="pillLoLang" style="display:none"></span>
+          <span class="pill model" id="pillModel" style="display:none"></span>
           <span class="status-badge" id="statusBadge"></span>
           <span class="row-index-pill" id="rowIndexPill"></span>
         </div>
+
+        <div class="lo-block" id="loBlock" style="display:none">
+          <div class="qa-label" id="loLabel">Learning objective</div>
+          <div class="lo-text" id="loText"></div>
+        </div>
+
+        <div class="co-annotator-note" id="otherAnnotators" style="display:none"></div>
 
         <div id="parseWarning" class="parse-warning" style="display:none">
           &#9888; The source data for this row is cut off / malformed — the question and/or answer below may be incomplete. Please flag it (e.g. "Wrong or missing answer" and/or "Incomplete / poorly phrased") rather than skipping it — see guideline #5/#6.

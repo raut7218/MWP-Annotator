@@ -12,7 +12,8 @@
     "seed": "node src/seedUsers.js",
     "migrate-to-pg": "node src/migrateSqliteToPg.js",
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "import-evaluation": "node src/importEvaluationXlsx.js"
   },
   "license": "ISC",
   "dependencies": {

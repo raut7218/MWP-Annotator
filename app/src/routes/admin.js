@@ -1,13 +1,19 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { all, get, run, allLanguages, allModels } from '../db.js';
+import { FLAG_KEYS } from '../flags.js';
 import { buildWorkbookForModelLanguages, workbookToBuffer } from '../exportXlsx.js';
 
 export const adminRouter = Router();
 
 adminRouter.get('/users', async (req, res) => {
   const rows = await all(
-    'SELECT id, username, display_name, languages, models, is_admin, active, created_at FROM users ORDER BY username'
+    `SELECT u.id, u.username, u.display_name, u.languages, u.models, u.is_admin, u.can_see_model, u.active, u.created_at,
+            COUNT(a.id)::int AS annotation_count
+     FROM users u
+     LEFT JOIN annotations a ON a.user_id = u.id AND a.status = 'reviewed'
+     GROUP BY u.id
+     ORDER BY u.username`
   );
   const users = rows.map((u) => ({
     id: u.id,
@@ -16,22 +22,24 @@ adminRouter.get('/users', async (req, res) => {
     languages: JSON.parse(u.languages || '[]'),
     models: JSON.parse(u.models || '[]'),
     isAdmin: !!u.is_admin,
+    canSeeModel: !!u.is_admin || !!u.can_see_model,
     active: !!u.active,
     createdAt: u.created_at,
+    reviewedCount: u.annotation_count,
   }));
   res.json({ users, availableLanguages: await allLanguages(), availableModels: await allModels() });
 });
 
 adminRouter.post('/users', async (req, res) => {
-  const { username, password, displayName, languages, models, isAdmin } = req.body || {};
+  const { username, password, displayName, languages, models, isAdmin, canSeeModel } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'username and password are required' });
   if (await get('SELECT id FROM users WHERE username = ?', [String(username).trim()])) {
     return res.status(409).json({ error: 'Username already exists' });
   }
   const hash = bcrypt.hashSync(String(password), 10);
   await run(
-    `INSERT INTO users (username, password_hash, display_name, languages, models, is_admin, active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO users (username, password_hash, display_name, languages, models, is_admin, can_see_model, active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       String(username).trim(),
       hash,
@@ -39,6 +47,7 @@ adminRouter.post('/users', async (req, res) => {
       JSON.stringify(Array.isArray(languages) ? languages : []),
       JSON.stringify(Array.isArray(models) ? models : []),
       isAdmin ? 1 : 0,
+      canSeeModel === false ? 0 : 1,
       new Date().toISOString(),
     ]
   );
@@ -55,23 +64,56 @@ adminRouter.patch('/users/:id', async (req, res) => {
   if (body.models !== undefined) await run('UPDATE users SET models = ? WHERE id = ?', [JSON.stringify(body.models), id]);
   if (body.active !== undefined) await run('UPDATE users SET active = ? WHERE id = ?', [body.active ? 1 : 0, id]);
   if (body.isAdmin !== undefined) await run('UPDATE users SET is_admin = ? WHERE id = ?', [body.isAdmin ? 1 : 0, id]);
+  // Whether this annotator is shown which LLM generated each problem.
+  if (body.canSeeModel !== undefined) await run('UPDATE users SET can_see_model = ? WHERE id = ?', [body.canSeeModel ? 1 : 0, id]);
   if (body.displayName !== undefined) await run('UPDATE users SET display_name = ? WHERE id = ?', [body.displayName, id]);
   if (body.password) await run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(String(body.password), 10), id]);
   res.json({ ok: true });
 });
 
+const flaggedExpr = FLAG_KEYS.map((k) => `a.${k} = 1`).join(' OR ');
+
 adminRouter.get('/overview', async (req, res) => {
-  const rows = await all(
-    `SELECT model, language, status, COUNT(*)::int as c FROM rows_data WHERE is_complete = 1 GROUP BY model, language, status`
+  const totals = await all(
+    `SELECT model, language, COUNT(*)::int AS total
+     FROM rows_data WHERE is_complete = 1 GROUP BY model, language`
   );
+  // Progress is per annotator now, so a sheet worked by two people shows two
+  // bars rather than one ambiguous number.
+  const perAnnotator = await all(
+    `SELECT r.model, r.language, u.id AS user_id, u.username, u.display_name,
+            SUM(CASE WHEN a.status = 'reviewed' THEN 1 ELSE 0 END)::int AS reviewed,
+            SUM(CASE WHEN ${flaggedExpr} THEN 1 ELSE 0 END)::int AS flagged
+     FROM annotations a
+     JOIN rows_data r ON r.id = a.row_id AND r.is_complete = 1
+     JOIN users u ON u.id = a.user_id
+     GROUP BY r.model, r.language, u.id, u.username, u.display_name
+     ORDER BY r.model, r.language, u.username`
+  );
+
   const byKey = {};
-  for (const r of rows) {
-    const key = `${r.model}::${r.language}`;
-    if (!byKey[key]) byKey[key] = { model: r.model, language: r.language, total: 0, reviewed: 0, pending: 0 };
-    byKey[key].total += r.c;
-    byKey[key][r.status] = (byKey[key][r.status] || 0) + r.c;
+  for (const t of totals) {
+    byKey[`${t.model}::${t.language}`] = {
+      model: t.model,
+      language: t.language,
+      total: t.total,
+      annotators: [],
+    };
   }
-  const overview = Object.values(byKey).sort((a, b) => a.model.localeCompare(b.model) || a.language.localeCompare(b.language));
+  for (const p of perAnnotator) {
+    const entry = byKey[`${p.model}::${p.language}`];
+    if (!entry) continue;
+    entry.annotators.push({
+      userId: p.user_id,
+      username: p.username,
+      displayName: p.display_name || p.username,
+      reviewed: p.reviewed,
+      flagged: p.flagged,
+    });
+  }
+  const overview = Object.values(byKey).sort(
+    (a, b) => a.model.localeCompare(b.model) || a.language.localeCompare(b.language)
+  );
   res.json({ overview });
 });
 
@@ -79,7 +121,7 @@ adminRouter.get('/export/:model/:language', async (req, res) => {
   const { model, language } = req.params;
   const wb = await buildWorkbookForModelLanguages([{ model, language }]);
   const buf = workbookToBuffer(wb);
-  res.setHeader('Content-Disposition', `attachment; filename="${model}_${language}_annotated.xlsx"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename(`${model}_${language}`)}_annotated.xlsx"`);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
 });
@@ -92,3 +134,9 @@ adminRouter.get('/export-all', async (req, res) => {
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
 });
+
+// Language names like "Māori" are fine in a sheet name but not in a bare
+// Content-Disposition filename, which must stay ASCII.
+function safeFilename(s) {
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_');
+}

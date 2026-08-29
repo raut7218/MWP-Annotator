@@ -23,18 +23,21 @@ for (const u of users) {
   const languages = JSON.stringify(u.languages || []);
   const models = JSON.stringify(u.models || []);
   const isAdmin = u.isAdmin ? 1 : 0;
+  // Default on: only turn it off for annotators who must stay blind to which
+  // LLM produced a problem.
+  const canSeeModel = u.canSeeModel === false ? 0 : 1;
   const existing = await get('SELECT id FROM users WHERE username = ?', [u.username]);
   if (existing) {
     await run(
-      'UPDATE users SET password_hash = ?, display_name = ?, languages = ?, models = ?, is_admin = ?, active = 1 WHERE username = ?',
-      [hash, u.displayName || u.username, languages, models, isAdmin, u.username]
+      'UPDATE users SET password_hash = ?, display_name = ?, languages = ?, models = ?, is_admin = ?, can_see_model = ?, active = 1 WHERE username = ?',
+      [hash, u.displayName || u.username, languages, models, isAdmin, canSeeModel, u.username]
     );
     console.log(`Updated user: ${u.username}`);
   } else {
     await run(
-      `INSERT INTO users (username, password_hash, display_name, languages, models, is_admin, active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
-      [u.username, hash, u.displayName || u.username, languages, models, isAdmin, new Date().toISOString()]
+      `INSERT INTO users (username, password_hash, display_name, languages, models, is_admin, can_see_model, active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      [u.username, hash, u.displayName || u.username, languages, models, isAdmin, canSeeModel, new Date().toISOString()]
     );
     console.log(`Created user: ${u.username}`);
   }

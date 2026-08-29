@@ -3,24 +3,59 @@
     "username": "admin",
     "password": "change-me-admin",
     "displayName": "Admin",
-    "languages": ["*"],
-    "models": ["*"],
+    "languages": [
+      "*"
+    ],
+    "models": [
+      "*"
+    ],
     "isAdmin": true
+  },
+  {
+    "username": "maori_annotator_1",
+    "password": "change-me-1",
+    "displayName": "Māori Annotator 1",
+    "languages": [
+      "Māori"
+    ],
+    "models": [
+      "LLM1",
+      "LLM2",
+      "LLM3",
+      "LLM4",
+      "LLM5"
+    ],
+    "isAdmin": false,
+    "canSeeModel": false
+  },
+  {
+    "username": "maori_annotator_2",
+    "password": "change-me-2",
+    "displayName": "Māori Annotator 2",
+    "languages": [
+      "Māori"
+    ],
+    "models": [
+      "LLM1",
+      "LLM2",
+      "LLM3",
+      "LLM4",
+      "LLM5"
+    ],
+    "isAdmin": false,
+    "canSeeModel": false
   },
   {
     "username": "hindi_annotator",
     "password": "change-me-hindi",
     "displayName": "Hindi Annotator",
-    "languages": ["Hindi"],
-    "models": ["qwen"],
-    "isAdmin": false
-  },
-  {
-    "username": "marathi_annotator",
-    "password": "change-me-marathi",
-    "displayName": "Marathi Annotator",
-    "languages": ["Marathi"],
-    "models": ["qwen"],
-    "isAdmin": false
+    "languages": [
+      "Hindi"
+    ],
+    "models": [
+      "qwen"
+    ],
+    "isAdmin": false,
+    "canSeeModel": true
   }
 ]

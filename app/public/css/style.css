@@ -391,3 +391,36 @@ table.data-table th { color: var(--text-dim); font-weight: 600; font-size: 12px;
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
 }
+
+/* Learning objective the problem was generated from, and the model badge
+   (only rendered for accounts allowed to see which LLM produced it). */
+.pill.model { background: #efe6ff; color: #5b2fb0; }
+
+.lo-block {
+  background: var(--gray-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.lo-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+
+.co-annotator-note {
+  background: #eef4ff;
+  border: 1px solid #cfe0ff;
+  color: #234a8f;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+/* Admin: one progress bar per annotator on a sheet. */
+.annotator-rows { margin-top: 10px; display: grid; gap: 7px; }
+.annotator-row { font-size: 12px; }
+.annotator-row .who { display: flex; justify-content: space-between; gap: 8px; color: var(--text-dim); }
+.annotator-row .who strong { color: var(--text); font-weight: 600; }
+.annotator-row .bar { height: 6px; margin: 4px 0 0; }
+.no-annotators { font-size: 12px; color: var(--text-dim); margin-top: 8px; font-style: italic; }
+.toggle-cell { white-space: nowrap; }

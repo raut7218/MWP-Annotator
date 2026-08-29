@@ -12,7 +12,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import XLSX from 'xlsx';
-import { get, run } from './db.js';
+import { get, run, invalidateModelsCache } from './db.js';
 import { FLAG_KEYS } from './flags.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +26,8 @@ function inferModelFromFilename(p) {
 }
 
 const model = (process.argv[3] ? String(process.argv[3]).trim() : '') || inferModelFromFilename(xlsxPath);
+
+const sourceFile = path.basename(xlsxPath);
 
 console.log('Reading workbook:', xlsxPath);
 console.log('Model:', model);
@@ -101,16 +103,16 @@ for (const sheetName of wb.SheetNames) {
     ]);
     if (existing) {
       await run(
-        `UPDATE rows_data SET grade = ?, topic = ?, question = ?, answer = ?, raw_response = ?, parse_error = ?, is_complete = ?
+        `UPDATE rows_data SET grade = ?, topic = ?, question = ?, answer = ?, raw_response = ?, parse_error = ?, is_complete = ?, source_file = ?
          WHERE model = ? AND language = ? AND row_index = ?`,
-        [grade, topic, question, answer, raw, parseError, isComplete, model, sheetName, rowIndex]
+        [grade, topic, question, answer, raw, parseError, isComplete, sourceFile, model, sheetName, rowIndex]
       );
       totalUpdated += 1;
     } else {
       await run(
-        `INSERT INTO rows_data (model, language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [model, sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete]
+        `INSERT INTO rows_data (model, language, row_index, grade, topic, question, answer, raw_response, parse_error, is_complete, source_file)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [model, sheetName, rowIndex, grade, topic, question, answer, raw, parseError, isComplete, sourceFile]
       );
       totalInserted += 1;
     }
@@ -119,6 +121,7 @@ for (const sheetName of wb.SheetNames) {
   console.log(`  ${sheetName}: ${json.length} rows with content, ${completeCount} usable (complete) for annotation`);
 }
 
+invalidateModelsCache();
 console.log(`Done. Inserted ${totalInserted} new rows, refreshed ${totalUpdated} existing rows.`);
 console.log('Flag columns tracked:', FLAG_KEYS.join(', '));
 process.exit(0);

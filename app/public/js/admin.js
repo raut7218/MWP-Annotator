@@ -38,14 +38,26 @@ async function loadOverview() {
   const exportButtons = el('exportButtons');
   exportButtons.innerHTML = '';
   for (const stats of overview) {
-    const pct = stats.total ? Math.round(((stats.reviewed || 0) / stats.total) * 100) : 0;
     const label = `${stats.model} · ${stats.language}`;
     const card = document.createElement('div');
     card.className = 'overview-card';
+    // Progress is per annotator: a double-annotated sheet gets one bar each,
+    // so it is obvious at a glance who has finished and who has not.
+    const annotators = (stats.annotators || []).slice().sort((a, b) => b.reviewed - a.reviewed);
+    const bars = annotators
+      .map((a) => {
+        const pct = stats.total ? Math.round((a.reviewed / stats.total) * 100) : 0;
+        return `
+          <div class="annotator-row">
+            <div class="who"><strong>${escapeHtml(a.displayName)}</strong><span>${a.reviewed} / ${stats.total} · ${a.flagged} flagged</span></div>
+            <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          </div>`;
+      })
+      .join('');
     card.innerHTML = `
       <div class="lang-name">${escapeHtml(label)}</div>
-      <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-      <div style="font-size:12.5px;color:var(--text-dim)">${stats.reviewed || 0} / ${stats.total} reviewed (${pct}%)</div>
+      <div style="font-size:12.5px;color:var(--text-dim)">${stats.total} problems &middot; ${annotators.length} annotator(s)</div>
+      ${annotators.length ? `<div class="annotator-rows">${bars}</div>` : '<div class="no-annotators">Not started yet.</div>'}
     `;
     grid.appendChild(card);
 
@@ -81,11 +93,39 @@ async function loadUsers() {
       <td>${escapeHtml(u.displayName || '')}</td>
       <td>${modelTags}</td>
       <td>${langTags}</td>
+      <td class="toggle-cell"></td>
+      <td>${u.reviewedCount || 0}</td>
       <td>${u.isAdmin ? 'Yes' : 'No'}</td>
       <td>${u.active ? 'Active' : 'Disabled'}</td>
       <td></td>
     `;
+    const seesModelTd = tr.children[4];
     const actionsTd = tr.lastElementChild;
+
+    // Whether this annotator is told which LLM generated each problem. Admins
+    // always see it; for everyone else it is this switch.
+    if (u.isAdmin) {
+      seesModelTd.textContent = 'Yes (admin)';
+    } else {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = u.canSeeModel;
+      cb.title = u.canSeeModel
+        ? 'This annotator sees the model name. Uncheck to hide it.'
+        : 'Model name is hidden from this annotator (shown as "Set 1", "Set 2", ...).';
+      cb.addEventListener('change', async () => {
+        cb.disabled = true;
+        try {
+          await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body: JSON.stringify({ canSeeModel: cb.checked }) });
+          loadUsers();
+        } catch (err) {
+          cb.checked = !cb.checked;
+          cb.disabled = false;
+          alert(err.message);
+        }
+      });
+      seesModelTd.appendChild(cb);
+    }
 
     if (!u.isAdmin) {
       const editModelsBtn = document.createElement('button');
@@ -168,6 +208,7 @@ async function addUser() {
   const isAdmin = el('newUserAdmin').checked;
   const languages = Array.from(el('newUserLangs').querySelectorAll('input:checked')).map((i) => i.value);
   const models = Array.from(el('newUserModels').querySelectorAll('input:checked')).map((i) => i.value);
+  const canSeeModel = el('newUserSeesModel').checked;
 
   if (!username || !password) {
     el('addUserError').innerHTML = '<div class="error-msg">Username and password are required.</div>';
@@ -176,12 +217,13 @@ async function addUser() {
   try {
     await api('/api/admin/users', {
       method: 'POST',
-      body: JSON.stringify({ username, displayName, password, isAdmin, languages, models }),
+      body: JSON.stringify({ username, displayName, password, isAdmin, languages, models, canSeeModel }),
     });
     el('newUsername').value = '';
     el('newDisplayName').value = '';
     el('newPassword').value = '';
     el('newUserAdmin').checked = false;
+    el('newUserSeesModel').checked = true;
     el('newUserLangs').querySelectorAll('input:checked').forEach((i) => (i.checked = false));
     el('newUserModels').querySelectorAll('input:checked').forEach((i) => (i.checked = false));
     loadUsers();

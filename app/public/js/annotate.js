@@ -1,10 +1,11 @@
 const state = {
   user: null,
   flagDefs: [],
-  model: null,
+  model: null, // { ref, label, name } — `ref` is what the API is addressed by
   language: null,
-  list: [], // [{id,row_index,status,flagged}]
+  list: [], // [{id,row_index,grade,loLanguage,status,flagged}]
   filter: 'all',
+  loFilter: 'all',
   currentRowIndex: null,
   currentRow: null, // full detail of loaded row
   dirty: false,
@@ -29,6 +30,11 @@ async function api(url, opts) {
   return data;
 }
 
+// The model a problem came from is addressed by an opaque ref, never by name:
+// annotators whose account has model visibility switched off must not be able
+// to read it out of a URL or a stored key either.
+const modelKey = (suffix) => `mwp_${suffix}_${state.user.username}_${state.model.ref}`;
+
 async function init() {
   const { user } = await api('/api/me');
   if (!user) return (window.location.href = 'index.html');
@@ -44,16 +50,17 @@ async function init() {
     return;
   }
 
-  const savedModel = localStorage.getItem('mwp_model_' + user.username);
+  wireStaticEvents();
+
+  const savedRef = localStorage.getItem('mwp_model_' + user.username);
+  const saved = models.find((m) => m.ref === savedRef);
   if (models.length === 1) {
-    await selectModel(models[0].model);
-  } else if (savedModel && models.some((m) => m.model === savedModel)) {
-    await selectModel(savedModel);
+    await selectModel(models[0]);
+  } else if (saved) {
+    await selectModel(saved);
   } else {
     renderModelPicker(models);
   }
-
-  wireStaticEvents();
 }
 
 function showEmpty(msg) {
@@ -72,35 +79,37 @@ function renderModelPicker(models) {
     const card = document.createElement('div');
     card.className = 'lang-card';
     card.innerHTML = `
-      <h3 style="text-transform:capitalize">${escapeHtml(m.model)}</h3>
+      <h3>${escapeHtml(m.label)}</h3>
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
       <div class="progress-text">${m.done} / ${m.total} reviewed &middot; ${m.flagged} flagged</div>
-      <button class="btn block">Choose model</button>
+      <button class="btn block">Choose</button>
     `;
-    card.querySelector('button').addEventListener('click', () => selectModel(m.model));
+    card.querySelector('button').addEventListener('click', () => selectModel(m));
     grid.appendChild(card);
   }
 }
 
 async function selectModel(model) {
   state.model = model;
-  localStorage.setItem('mwp_model_' + state.user.username, model);
+  localStorage.setItem('mwp_model_' + state.user.username, model.ref);
   el('modelPickerView').style.display = 'none';
 
   const { models } = await api('/api/models');
+  const current = models.find((m) => m.ref === model.ref) || model;
+  state.model = current;
   if (models.length > 1) {
     el('modelSelect').style.display = 'inline-block';
     el('modelBadge').style.display = 'none';
     const sel = el('modelSelect');
-    sel.innerHTML = models.map((m) => `<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)}</option>`).join('');
-    sel.value = model;
+    sel.innerHTML = models.map((m) => `<option value="${escapeHtml(m.ref)}">${escapeHtml(m.label)}</option>`).join('');
+    sel.value = current.ref;
   } else {
     el('modelBadge').style.display = 'inline-block';
-    el('modelBadge').textContent = model;
+    el('modelBadge').textContent = current.label;
     el('modelSelect').style.display = 'none';
   }
 
-  const { languages } = await api(`/api/models/${encodeURIComponent(model)}/languages`);
+  const { languages } = await api(`/api/models/${encodeURIComponent(current.ref)}/languages`);
   if (languages.length === 0) {
     el('pickerView').style.display = 'none';
     el('layoutView').style.display = 'none';
@@ -109,7 +118,7 @@ async function selectModel(model) {
   }
   el('emptyView').style.display = 'none';
 
-  const saved = localStorage.getItem('mwp_lang_' + state.user.username + '_' + model);
+  const saved = localStorage.getItem(modelKey('lang'));
   if (languages.length === 1) {
     await selectLanguage(languages[0].language);
   } else if (saved && languages.some((l) => l.language === saved)) {
@@ -141,12 +150,12 @@ function renderLanguagePicker(languages) {
 
 async function selectLanguage(language) {
   state.language = language;
-  localStorage.setItem('mwp_lang_' + state.user.username + '_' + state.model, language);
+  localStorage.setItem(modelKey('lang'), language);
   el('pickerView').style.display = 'none';
   el('layoutView').style.display = 'grid';
   el('progressWrap').style.display = 'flex';
 
-  const { languages } = await api(`/api/models/${encodeURIComponent(state.model)}/languages`);
+  const { languages } = await api(`/api/models/${encodeURIComponent(state.model.ref)}/languages`);
   if (languages.length > 1) {
     el('langSelect').style.display = 'inline-block';
     el('langBadge').style.display = 'none';
@@ -160,7 +169,7 @@ async function selectLanguage(language) {
   }
 
   await refreshList();
-  const savedRow = Number(localStorage.getItem('mwp_row_' + state.user.username + '_' + state.model + '_' + language));
+  const savedRow = Number(localStorage.getItem(modelKey('row') + '_' + language));
   const firstPending = state.list.find((r) => r.status !== 'reviewed');
   const startRow = savedRow && state.list.some((r) => r.row_index === savedRow)
     ? savedRow
@@ -169,8 +178,11 @@ async function selectLanguage(language) {
 }
 
 async function refreshList() {
-  const { items } = await api(`/api/rows/${encodeURIComponent(state.model)}/${encodeURIComponent(state.language)}/list`);
+  const { items } = await api(
+    `/api/rows/${encodeURIComponent(state.model.ref)}/${encodeURIComponent(state.language)}/list`
+  );
   state.list = items;
+  renderLoFilter();
   renderGridNav();
   renderProgress();
 }
@@ -183,11 +195,33 @@ function renderProgress() {
   el('progressText').textContent = `${done} / ${total} reviewed`;
 }
 
+// The same learning objective was prompted in more than one language, so a
+// sheet holds two passes over the same objectives; this lets an annotator work
+// one pass at a time. Hidden when a sheet only has one.
+function renderLoFilter() {
+  const langs = [...new Set(state.list.map((r) => r.loLanguage).filter(Boolean))].sort();
+  const wrap = el('loFilterBlock');
+  if (langs.length < 2) {
+    wrap.style.display = 'none';
+    state.loFilter = 'all';
+    return;
+  }
+  wrap.style.display = 'block';
+  const row = el('loFilterRow');
+  row.innerHTML =
+    `<button class="chip${state.loFilter === 'all' ? ' active' : ''}" data-lo="all">All</button>` +
+    langs
+      .map((l) => `<button class="chip${state.loFilter === l ? ' active' : ''}" data-lo="${escapeHtml(l)}">${escapeHtml(l)}</button>`)
+      .join('');
+}
+
 function filteredList() {
-  if (state.filter === 'pending') return state.list.filter((r) => r.status !== 'reviewed');
-  if (state.filter === 'reviewed') return state.list.filter((r) => r.status === 'reviewed');
-  if (state.filter === 'flagged') return state.list.filter((r) => r.flagged);
-  return state.list;
+  let list = state.list;
+  if (state.loFilter !== 'all') list = list.filter((r) => r.loLanguage === state.loFilter);
+  if (state.filter === 'pending') return list.filter((r) => r.status !== 'reviewed');
+  if (state.filter === 'reviewed') return list.filter((r) => r.status === 'reviewed');
+  if (state.filter === 'flagged') return list.filter((r) => r.flagged);
+  return list;
 }
 
 function renderGridNav() {
@@ -216,17 +250,37 @@ async function goToRow(rowIndex) {
 }
 
 async function loadRow(rowIndex) {
-  const { row, total } = await api(`/api/rows/${encodeURIComponent(state.model)}/${encodeURIComponent(state.language)}/${rowIndex}`);
+  const { row, total, otherAnnotators } = await api(
+    `/api/rows/${encodeURIComponent(state.model.ref)}/${encodeURIComponent(state.language)}/${rowIndex}`
+  );
   state.currentRow = row;
   state.currentRowIndex = rowIndex;
   state.dirty = false;
-  localStorage.setItem('mwp_row_' + state.user.username + '_' + state.model + '_' + state.language, rowIndex);
+  localStorage.setItem(modelKey('row') + '_' + state.language, rowIndex);
 
   el('pillGrade').textContent = row.grade ? `Grade ${row.grade}` : 'Grade —';
-  el('pillTopic').textContent = row.topic || '';
-  el('pillTopic').title = row.topic || '';
+  setPill('pillTopic', row.topic);
+  setPill('pillLoLang', row.loLanguage ? `LO in ${row.loLanguage}` : '');
+  // Only present when the account is allowed to see it.
+  setPill('pillModel', row.model.name ? `Model: ${row.model.name}` : '');
   el('rowIndexPill').textContent = `Row ${rowIndex} of ${total}`;
   setStatusBadge(row.status);
+
+  const loBlock = el('loBlock');
+  if (row.learningObjective) {
+    loBlock.style.display = 'block';
+    el('loLabel').textContent = row.loCode ? `Learning objective (${row.loCode})` : 'Learning objective';
+    el('loText').textContent = row.learningObjective;
+  } else {
+    loBlock.style.display = 'none';
+  }
+
+  const others = el('otherAnnotators');
+  others.style.display = otherAnnotators > 0 ? 'block' : 'none';
+  others.textContent =
+    otherAnnotators === 1
+      ? '1 other annotator has already reviewed this problem — annotate it independently.'
+      : `${otherAnnotators} other annotators have already reviewed this problem — annotate it independently.`;
 
   el('parseWarning').style.display = row.parseError ? 'block' : 'none';
   el('questionText').textContent = row.question || '(empty)';
@@ -241,8 +295,15 @@ async function loadRow(rowIndex) {
   el('commentsBox').oninput = markDirty;
 
   renderGridNav();
-  const cur = grid_scrollToCurrent();
+  grid_scrollToCurrent();
   updatePrevNextEnabled();
+}
+
+function setPill(id, text) {
+  const node = el(id);
+  node.textContent = text || '';
+  node.title = text || '';
+  node.style.display = text ? 'inline-block' : 'none';
 }
 
 function grid_scrollToCurrent() {
@@ -321,7 +382,9 @@ async function saveRow() {
   state.saving = true;
   const { flags, comments } = collectForm();
   try {
-    const { row } = await api(`/api/rows/${state.currentRow.id}`, {
+    // Saves this annotator's own annotation; anyone else on the same sheet
+    // keeps theirs.
+    const { row } = await api(`/api/annotations/${state.currentRow.id}`, {
       method: 'PUT',
       body: JSON.stringify({ flags, comments, status: 'reviewed' }),
     });
@@ -381,7 +444,9 @@ function wireStaticEvents() {
 
   el('modelSelect').addEventListener('change', async (e) => {
     await maybeAutosave();
-    await selectModel(e.target.value);
+    const { models } = await api('/api/models');
+    const picked = models.find((m) => m.ref === e.target.value);
+    if (picked) await selectModel(picked);
   });
 
   el('langSelect').addEventListener('change', async (e) => {
@@ -399,6 +464,15 @@ function wireStaticEvents() {
     document.querySelectorAll('#filterRow .chip').forEach((c) => c.classList.remove('active'));
     btn.classList.add('active');
     state.filter = btn.dataset.filter;
+    renderGridNav();
+    updatePrevNextEnabled();
+  });
+
+  el('loFilterRow').addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    state.loFilter = btn.dataset.lo;
+    renderLoFilter();
     renderGridNav();
     updatePrevNextEnabled();
   });
