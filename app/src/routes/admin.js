@@ -166,6 +166,51 @@ adminRouter.delete('/data/:model/:language', async (req, res) => {
   res.json({ ok: true, deletedRows: counts.rows, deletedAnnotations: counts.annotations });
 });
 
+// Resetting annotator work without touching the problems themselves — e.g.
+// to give annotators a clean slate on a sheet that was reviewed under wrong
+// guidelines. Unlike /data/:model/:language this never touches rows_data (or
+// learning objectives); only the annotations table is cleared.
+adminRouter.delete('/annotations/:model/:language', async (req, res) => {
+  const { model, language } = req.params;
+  const counts = await get(
+    `SELECT COUNT(*)::int AS annotations
+     FROM annotations a JOIN rows_data r ON r.id = a.row_id
+     WHERE r.model = ? AND r.language = ?`,
+    [model, language]
+  );
+  if (!counts.annotations) return res.status(404).json({ error: 'No annotations for that model and language' });
+  if (Number(req.query.confirmCount) !== counts.annotations) {
+    return res.status(409).json({
+      error: `Refusing to clear: expected confirmCount=${counts.annotations}`,
+      annotations: counts.annotations,
+    });
+  }
+  await run(
+    `DELETE FROM annotations WHERE id IN (
+       SELECT a.id FROM annotations a JOIN rows_data r ON r.id = a.row_id
+       WHERE r.model = ? AND r.language = ?
+     )`,
+    [model, language]
+  );
+  res.json({ ok: true, clearedAnnotations: counts.annotations });
+});
+
+// Permanently removing a user account. Their annotations cascade-delete with
+// them (annotations.user_id has ON DELETE CASCADE) so no orphaned rows are
+// left behind; the underlying problems (rows_data) are never touched.
+adminRouter.delete('/users/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+  const target = await get('SELECT id, is_admin FROM users WHERE id = ?', [id]);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.is_admin) {
+    const { count } = await get(`SELECT COUNT(*)::int AS count FROM users WHERE is_admin = 1`);
+    if (count <= 1) return res.status(400).json({ error: 'Cannot delete the only remaining admin' });
+  }
+  await run('DELETE FROM users WHERE id = ?', [id]);
+  res.json({ ok: true });
+});
+
 // Language names like "Māori" are fine in a sheet name but not in a bare
 // Content-Disposition filename, which must stay ASCII.
 function safeFilename(s) {

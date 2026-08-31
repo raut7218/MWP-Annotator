@@ -37,6 +37,8 @@ async function loadOverview() {
   grid.innerHTML = '';
   const exportButtons = el('exportButtons');
   exportButtons.innerHTML = '';
+  const clearAnnotationsButtons = el('clearAnnotationsButtons');
+  clearAnnotationsButtons.innerHTML = '';
   const deleteButtons = el('deleteButtons');
   deleteButtons.innerHTML = '';
   for (const stats of overview) {
@@ -71,6 +73,13 @@ async function loadOverview() {
     });
     exportButtons.appendChild(btn);
 
+    // Resetting annotator work on a sheet without touching the problems.
+    const clearAnnotations = document.createElement('button');
+    clearAnnotations.className = 'btn danger';
+    clearAnnotations.textContent = `Clear annotations: ${label}`;
+    clearAnnotations.addEventListener('click', () => clearAnnotationsFor(stats));
+    clearAnnotationsButtons.appendChild(clearAnnotations);
+
     // Clearing a sheet imported wrongly. Deleting rows cascades to their
     // annotations, so confirm with the actual counts rather than a bare yes.
     const del = document.createElement('button');
@@ -78,6 +87,39 @@ async function loadOverview() {
     del.textContent = `Delete ${label}`;
     del.addEventListener('click', () => deleteDataset(stats));
     deleteButtons.appendChild(del);
+  }
+}
+
+async function clearAnnotationsFor(stats) {
+  const label = `${stats.model} · ${stats.language}`;
+  const url = `/api/admin/annotations/${encodeURIComponent(stats.model)}/${encodeURIComponent(stats.language)}`;
+  // The endpoint requires the exact current count as confirmation; probe for
+  // it with a count that can never match, then read it back off the 409.
+  let expected = null;
+  try {
+    await api(`${url}?confirmCount=-1`, { method: 'DELETE' });
+  } catch (err) {
+    const match = /confirmCount=(\d+)/.exec(err.message);
+    expected = match ? Number(match[1]) : null;
+  }
+  if (!expected) {
+    alert(`No annotations found for ${label}.`);
+    return;
+  }
+  const ok = confirm(
+    `Clear all ${expected} saved annotation(s) for ${label}?\n\n` +
+      `The imported problems and everything else stay untouched. This cannot be undone.`
+  );
+  if (!ok) return;
+  try {
+    await api(
+      `/api/admin/annotations/${encodeURIComponent(stats.model)}/${encodeURIComponent(stats.language)}?confirmCount=${expected}`,
+      { method: 'DELETE' }
+    );
+    await loadOverview();
+    await loadUsers();
+  } catch (err) {
+    alert(err.message);
   }
 }
 
@@ -192,6 +234,30 @@ async function loadUsers() {
       alert('Password updated.');
     });
     actionsTd.appendChild(resetBtn);
+
+    // Permanent removal — unlike Disable this cannot be undone, so it asks
+    // for the username to be typed back rather than a bare confirm().
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.style.marginLeft = '6px';
+    deleteBtn.addEventListener('click', async () => {
+      const typed = prompt(
+        `Permanently delete ${u.username}${u.reviewedCount ? ` and their ${u.reviewedCount} saved annotation(s)` : ''}?\n\n` +
+          `This cannot be undone. Type the username to confirm:`
+      );
+      if (typed !== u.username) {
+        if (typed !== null) alert('Username did not match — nothing was deleted.');
+        return;
+      }
+      try {
+        await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+        loadUsers();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+    actionsTd.appendChild(deleteBtn);
 
     body.appendChild(tr);
   }
