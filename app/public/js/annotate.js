@@ -418,7 +418,7 @@ function updatePrevNextEnabled() {
   const flist = filteredList();
   const pos = currentPosInFiltered();
   el('prevBtn').disabled = !(pos > 0);
-  el('saveNextBtn').textContent = pos >= 0 && pos < flist.length - 1 ? 'Save & Next →' : 'Save (last row)';
+  el('saveNextBtn').textContent = pos >= 0 && pos < flist.length - 1 ? 'Save & Next →' : 'Save';
 }
 
 async function goNext() {
