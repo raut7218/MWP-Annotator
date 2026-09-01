@@ -7,3 +7,4 @@ users.seed.json
 .env
 .env.*
 !.env.example
+backups/

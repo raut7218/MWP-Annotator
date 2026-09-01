@@ -189,6 +189,10 @@ sheet exports both takes side by side:
 
 ## Database schema
 
+See [SCHEMA.md](SCHEMA.md) for the full reference — every table's DDL,
+example rows, an ER diagram, and the rationale behind each design choice.
+Short version below.
+
 Four tables, deliberately kept apart so adding models, languages, learning
 objectives or annotators never requires reshaping the others:
 

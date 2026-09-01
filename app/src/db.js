@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { FLAG_KEYS } from './flags.js';
 
-const { Pool } = pg;
+const { Pool, Client } = pg;
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -25,9 +25,34 @@ function shouldUseSsl(url) {
   return !(!host || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('/'));
 }
 
+// Every query in this app uses unqualified table names (`FROM rows_data`,
+// not `FROM public.rows_data`), which relies on `search_path` resolving to
+// `public`. That's the normal Postgres default, but some pooled connection
+// setups (e.g. Neon's PgBouncer endpoint, which also refuses `search_path`
+// as a startup parameter — it isn't just declined, it's a hard connection
+// error) hand out a session with an *empty* search_path, silently breaking
+// every query with "relation does not exist": login, reads, writes, all of
+// it. `pool.on('connect', ...)` can't fix this reliably — it fires without
+// the pool waiting for the handler's promise, so a query issued right after
+// checkout can race the fix. Overriding `connect()` itself makes the pool's
+// own readiness wait on it instead.
+class SearchPathClient extends Client {
+  connect(callback) {
+    if (callback) {
+      super.connect((err) => {
+        if (err) return callback(err);
+        this.query('SET search_path TO public', (err2) => callback(err2));
+      });
+      return undefined;
+    }
+    return super.connect().then(() => this.query('SET search_path TO public'));
+  }
+}
+
 export const pool = new Pool({
   connectionString,
   ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : false,
+  Client: SearchPathClient,
 });
 
 // Prepared-statement-style call sites elsewhere use `?` placeholders (carried
@@ -58,6 +83,26 @@ async function columnExists(table, column) {
     [table, column]
   );
   return !!r;
+}
+
+async function columnType(table, column) {
+  const r = await get(
+    `SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+    [table, column]
+  );
+  return r?.data_type;
+}
+
+// ALTER TABLE ... ADD CONSTRAINT has no IF NOT EXISTS in Postgres, so check
+// pg_constraint ourselves to keep this idempotent like the rest of the file.
+async function addConstraintIfMissing(table, name, definition) {
+  const exists = await get(
+    `SELECT 1 AS x FROM pg_constraint WHERE conname = ? AND conrelid = ?::regclass`,
+    [name, table]
+  );
+  if (!exists) {
+    await pool.query(`ALTER TABLE ${table} ADD CONSTRAINT ${name} ${definition};`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +235,50 @@ for (const key of FLAG_KEYS) {
 
 await pool.query('CREATE INDEX IF NOT EXISTS idx_annotations_row ON annotations(row_id);');
 await pool.query('CREATE INDEX IF NOT EXISTS idx_annotations_user ON annotations(user_id);');
+
+// ---------------------------------------------------------------------------
+// Integrity guards.
+//
+// A handful of columns are booleans/enums stored as integer/text (carried
+// over from the original SQLite schema). The app has always only ever
+// written 0/1 and 'pending'/'reviewed' into them, but nothing in the
+// database enforced that — a bug or a stray manual UPDATE could silently
+// write anything. These CHECK constraints make the existing convention a
+// guarantee instead of a habit; they don't change what any query returns
+// because every row already satisfies them.
+// ---------------------------------------------------------------------------
+
+await addConstraintIfMissing('users', 'users_is_admin_bool', 'CHECK (is_admin IN (0, 1))');
+await addConstraintIfMissing('users', 'users_active_bool', 'CHECK (active IN (0, 1))');
+await addConstraintIfMissing('users', 'users_can_see_model_bool', 'CHECK (can_see_model IN (0, 1))');
+
+await addConstraintIfMissing('rows_data', 'rows_data_parse_error_bool', 'CHECK (parse_error IN (0, 1))');
+await addConstraintIfMissing('rows_data', 'rows_data_is_complete_bool', 'CHECK (is_complete IN (0, 1))');
+
+for (const key of FLAG_KEYS) {
+  await addConstraintIfMissing('annotations', `annotations_${key}_bool`, `CHECK (${key} IN (0, 1))`);
+}
+await addConstraintIfMissing('annotations', 'annotations_status_enum', `CHECK (status IN ('pending', 'reviewed'))`);
+
+// users.created_at was TEXT (an ISO string written by app code); every
+// existing value parses as one, so this is a straight, lossless type fix.
+// Nothing reads it as a string today (routes/admin.js passes it straight
+// through to JSON, where a Date serialises to the same ISO format).
+if ((await columnType('users', 'created_at')) === 'text') {
+  await pool.query(
+    `ALTER TABLE users ALTER COLUMN created_at TYPE TIMESTAMPTZ USING (NULLIF(created_at, '')::timestamptz);`
+  );
+}
+await pool.query(`ALTER TABLE users ALTER COLUMN created_at SET DEFAULT now();`);
+
+// rows_data and learning_objectives had no timestamps at all, so there was
+// no way to tell when a problem was imported or a learning objective added.
+// Existing rows backfill to the moment this migration runs (their true
+// import time isn't recoverable); new rows get a real value going forward.
+await pool.query(`ALTER TABLE rows_data ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();`);
+await pool.query(
+  `ALTER TABLE learning_objectives ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();`
+);
 
 // ---------------------------------------------------------------------------
 // One-time migration: annotations used to live as columns on rows_data, with
