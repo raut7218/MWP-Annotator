@@ -409,6 +409,34 @@ async function maybeAutosave() {
   if (state.dirty) await saveRow();
 }
 
+// Removes this annotator's saved annotation entirely (flags, comments,
+// reviewed status), reverting the row to pending — as if never annotated.
+async function clearAnnotation() {
+  if (!state.currentRow || state.saving) return;
+  state.saving = true;
+  try {
+    const { row } = await api(`/api/annotations/${state.currentRow.id}`, { method: 'DELETE' });
+    state.currentRow = row;
+    state.dirty = false;
+    renderFlags(row.flags);
+    el('commentsBox').value = row.comments || '';
+    document.querySelectorAll('#flagsGrid input').forEach((cb) => cb.addEventListener('change', markDirty));
+    el('commentsBox').oninput = markDirty;
+    setStatusBadge(row.status);
+    el('saveStatus').textContent = 'Cleared';
+    el('saveStatus').className = 'save-status';
+    const item = state.list.find((r) => r.row_index === state.currentRowIndex);
+    if (item) {
+      item.status = row.status;
+      item.flagged = Object.values(row.flags).some(Boolean);
+    }
+    renderGridNav();
+    renderProgress();
+  } finally {
+    state.saving = false;
+  }
+}
+
 function currentPosInFiltered() {
   const flist = filteredList();
   return flist.findIndex((r) => r.row_index === state.currentRowIndex);
@@ -507,6 +535,12 @@ function wireStaticEvents() {
     markDirty();
     await saveRow();
     await goNext();
+  });
+  el('clearAnnotationBtn').addEventListener('click', async () => {
+    if (!state.currentRow) return;
+    const ok = confirm('Clear your annotation for this problem? This removes your flags, comments, and reviewed status — it cannot be undone.');
+    if (!ok) return;
+    await clearAnnotation();
   });
 
   document.addEventListener('keydown', async (e) => {

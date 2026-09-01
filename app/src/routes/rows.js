@@ -208,6 +208,23 @@ rowsRouter.put('/annotations/:rowId', async (req, res) => {
   res.json({ row: shapeRow(updated, req.user, sorted) });
 });
 
+// Wipes this annotator's take on a problem entirely — flags, comments, and
+// the reviewed status all go away, leaving the row exactly as if it had
+// never been touched. Only ever touches the caller's own annotation.
+rowsRouter.delete('/annotations/:rowId', async (req, res) => {
+  const rowId = Number(req.params.rowId);
+  const existing = await get('SELECT * FROM rows_data WHERE id = ?', [rowId]);
+  if (!existing) return res.status(404).json({ error: 'Row not found' });
+  if (!canAccessModel(req.user, existing.model)) return res.status(403).json({ error: 'No access to this model' });
+  if (!canAccessLanguage(req.user, existing.language)) return res.status(403).json({ error: 'No access to this language' });
+
+  await run('DELETE FROM annotations WHERE row_id = ? AND user_id = ?', [rowId, req.user.id]);
+
+  const sorted = await allModels();
+  const updated = await get(rowDetailSql, [req.user.id, existing.model, existing.language, existing.row_index]);
+  res.json({ row: shapeRow(updated, req.user, sorted) });
+});
+
 function shapeRow(r, user, allModelsSorted) {
   const flags = {};
   for (const k of FLAG_KEYS) flags[k] = !!r[`flag_${k}`];
