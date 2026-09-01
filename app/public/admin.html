@@ -25,8 +25,12 @@
     <div class="admin-section">
       <h2>Export annotated data</h2>
       <p style="color:var(--text-dim);font-size:13px">Downloads an .xlsx with the problem, its learning objective, the model that generated it, and one row per annotator with their flags, comments and review status.</p>
-      <div class="form-row" id="exportButtons"></div>
-      <div class="form-row"><button class="btn secondary" id="exportAllBtn">Export all models &amp; languages (one workbook)</button></div>
+      <p style="color:var(--text-dim);font-size:13px">Tick the models/languages you want below, then export them together as one workbook.</p>
+      <div class="checkbox-list" id="exportSelectCards"></div>
+      <div class="form-row">
+        <button class="btn" id="exportSelectedBtn">Export selected (one workbook)</button>
+        <button class="btn secondary" id="exportAllBtn">Export all models &amp; languages (one workbook)</button>
+      </div>
     </div>
 
     <div class="admin-section">

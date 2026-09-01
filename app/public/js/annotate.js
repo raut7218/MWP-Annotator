@@ -468,13 +468,18 @@ function wireStaticEvents() {
     updatePrevNextEnabled();
   });
 
-  el('loFilterRow').addEventListener('click', (e) => {
+  el('loFilterRow').addEventListener('click', async (e) => {
     const btn = e.target.closest('.chip');
     if (!btn) return;
     state.loFilter = btn.dataset.lo;
     renderLoFilter();
-    renderGridNav();
-    updatePrevNextEnabled();
+    const first = filteredList()[0];
+    if (first) {
+      await goToRow(first.row_index);
+    } else {
+      renderGridNav();
+      updatePrevNextEnabled();
+    }
   });
 
   el('jumpInput').addEventListener('keydown', async (e) => {

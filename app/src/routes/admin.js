@@ -135,6 +135,23 @@ adminRouter.get('/export-all', async (req, res) => {
   res.send(buf);
 });
 
+// Lets an admin pick a subset of models/languages (rather than every sheet,
+// or just one) and get them all back as a single workbook, one tab each.
+adminRouter.post('/export-selected', async (req, res) => {
+  const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
+  const clean = pairs
+    .filter((p) => p && typeof p.model === 'string' && typeof p.language === 'string')
+    .map((p) => ({ model: p.model, language: p.language }));
+  if (!clean.length) {
+    return res.status(400).json({ error: 'No models/languages selected.' });
+  }
+  const wb = await buildWorkbookForModelLanguages(clean);
+  const buf = workbookToBuffer(wb);
+  res.setHeader('Content-Disposition', 'attachment; filename="selected_annotated.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
 // Clearing a sheet that was imported wrongly. Deleting the rows cascades to
 // their annotations, so this asks for the exact row count back as
 // confirmation rather than trusting a button press.

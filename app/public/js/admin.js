@@ -28,6 +28,8 @@ async function init() {
     window.location.href = '/api/admin/export-all';
   });
 
+  el('exportSelectedBtn').addEventListener('click', exportSelected);
+
   el('addUserBtn').addEventListener('click', addUser);
 }
 
@@ -35,8 +37,8 @@ async function loadOverview() {
   const { overview } = await api('/api/admin/overview');
   const grid = el('overviewGrid');
   grid.innerHTML = '';
-  const exportButtons = el('exportButtons');
-  exportButtons.innerHTML = '';
+  const exportSelectCards = el('exportSelectCards');
+  exportSelectCards.innerHTML = '';
   const clearAnnotationsButtons = el('clearAnnotationsButtons');
   clearAnnotationsButtons.innerHTML = '';
   const deleteButtons = el('deleteButtons');
@@ -65,13 +67,12 @@ async function loadOverview() {
     `;
     grid.appendChild(card);
 
-    const btn = document.createElement('button');
-    btn.className = 'btn secondary';
-    btn.textContent = `Export ${label}`;
-    btn.addEventListener('click', () => {
-      window.location.href = `/api/admin/export/${encodeURIComponent(stats.model)}/${encodeURIComponent(stats.language)}`;
-    });
-    exportButtons.appendChild(btn);
+    // One checkbox per model/language sheet, so an admin can tick several
+    // (say five different LLMs) and export them together as one workbook,
+    // instead of downloading each model's data separately.
+    const pickLabel = document.createElement('label');
+    pickLabel.innerHTML = `<input type="checkbox" data-model="${escapeHtml(stats.model)}" data-language="${escapeHtml(stats.language)}" /> ${escapeHtml(label)} (${stats.total})`;
+    exportSelectCards.appendChild(pickLabel);
 
     // Resetting annotator work on a sheet without touching the problems.
     const clearAnnotations = document.createElement('button');
@@ -87,6 +88,42 @@ async function loadOverview() {
     del.textContent = `Delete ${label}`;
     del.addEventListener('click', () => deleteDataset(stats));
     deleteButtons.appendChild(del);
+  }
+}
+
+async function exportSelected() {
+  const checked = Array.from(el('exportSelectCards').querySelectorAll('input:checked'));
+  if (!checked.length) {
+    alert('Tick at least one model/language to export.');
+    return;
+  }
+  const pairs = checked.map((cb) => ({ model: cb.dataset.model, language: cb.dataset.language }));
+  const btn = el('exportSelectedBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/admin/export-selected', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairs }),
+    });
+    if (res.status === 401) return (window.location.href = 'index.html');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Export failed');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'selected_annotated.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 
